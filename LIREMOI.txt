@@ -1,0 +1,18 @@
+========================================
+  Egypt Grid - Demarrage de l'application
+========================================
+
+IMPORTANT : Ne lancez pas l'application avec "flutter run" directement.
+Le backend doit etre demarre avant l'application.
+
+PROCEDURE RECOMMANDEE :
+  1. Double-cliquez sur start.bat a la racine du projet.
+  2. Attendez environ 8 secondes (le backend demarre en arriere-plan).
+  3. L'application s'ouvre ensuite automatiquement dans Chrome.
+
+ASTUCE :
+  Creez un raccourci de start.bat sur le bureau pour lancer
+  Egypt Grid en un seul clic.
+
+========================================
+

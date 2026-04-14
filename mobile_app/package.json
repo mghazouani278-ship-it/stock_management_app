@@ -1,0 +1,10 @@
+{
+  "name": "stock-management-app",
+  "version": "1.0.0",
+  "description": "Mobile Stock & Project Management Application - Flutter Web",
+  "scripts": {
+    "build": "flutter build web",
+    "start": "flutter run -d chrome",
+    "serve": "flutter pub get && flutter run -d chrome"
+  }
+}

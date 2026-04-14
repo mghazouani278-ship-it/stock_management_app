@@ -1,0 +1,698 @@
+{
+  "@@locale": "en",
+
+  "cancel": "Cancel",
+  "save": "Save",
+  "add": "Add",
+  "delete": "Delete",
+  "edit": "Edit",
+  "viewDetails": "View details",
+  "close": "Close",
+
+  "welcomeBack": "Welcome back",
+  "warehouse": "Warehouse",
+  "warehouseDashboard": "Warehouse Dashboard",
+  "adminDashboard": "Admin Dashboard",
+  "dashboard": "Dashboard",
+
+  "stock": "Stock",
+  "warehouseStockEntryBannerTitle": "Warehouse added stock",
+  "warehouseStockEntryLine": "{productName} · +{quantity} · {storeName}",
+  "@warehouseStockEntryLine": {
+    "placeholders": {
+      "productName": {"type": "String"},
+      "quantity": {"type": "String"},
+      "storeName": {"type": "String"}
+    }
+  },
+  "warehouseStockAddedOnCard": "+{quantity} (warehouse)",
+  "@warehouseStockAddedOnCard": {
+    "placeholders": {
+      "quantity": {"type": "String"}
+    }
+  },
+  "projects": "Projects",
+  "orders": "Orders",
+  "myDistributions": "My Distributions",
+  "totalStock": "Total Stock",
+  "reports": "Reports",
+  "selectReportType": "Select a report type",
+  "searchReportsHint": "Search reports...",
+  "noReportTypesMatchSearch": "No report types match your search.",
+  "searchReportHint": "Search report...",
+  "reportValidatedDistributions": "Validated Distributions",
+  "reportValidatedDistributionsMenu": "Validated\nDistributions",
+  "reportApprovedReturns": "Approved Returns",
+  "reportApprovedReturnsMenu": "Approved\nReturns",
+  "reportStockHistory": "Stock History",
+  "reportStockHistoryMenu": "Stock\nHistory",
+  "reportProjects": "Projects",
+  "reportProjectsMenu": "Projects",
+  "reportExportProjectPdf": "Export PDF",
+  "projectSavedShort": "Project saved",
+  "quantityRest": "Rest",
+  "reportDeleteTypeDistribution": "distribution",
+  "reportDeleteTypeOrder": "order",
+  "reportDeleteTypeReturn": "return",
+  "reportDeleteTypeDamagedProduct": "damaged product record",
+  "reportDeleteTypeStockEntry": "stock history entry",
+  "damagedProducts": "Damaged Products",
+  "damagedProductsMenu": "Damaged\nProducts",
+  "returns": "Returns",
+  "damages": "Damages",
+
+  "users": "Users",
+  "stores": "Stores",
+  "products": "Products",
+  "distributions": "Distributions",
+  "supplementaryRequests": "Supplementary Requests",
+
+  "email": "Email",
+  "password": "Password",
+  "login": "Login",
+  "logout": "Logout",
+  "signInToContinue": "Sign in to continue",
+  "signIn": "Sign in",
+  "retry": "Retry",
+  "pleaseEnterEmail": "Please enter your email",
+  "pleaseEnterValidEmail": "Please enter a valid email",
+  "pleaseEnterPassword": "Please enter your password",
+
+  "createDistribution": "Create Distribution",
+  "addProduct": "Add Product",
+  "product": "Product",
+  "quantity": "Quantity",
+  "project": "Project",
+  "store": "Store",
+  "depot": "Depot",
+  "sourceStoreDepot": "Source (Store/Depot)",
+  "selectLocationHint": "Select the location with stock to distribute from",
+  "materialRequestOptional": "Material Request (optional)",
+  "materialRequestHint": "Leave empty for auto-generated",
+  "distributionDate": "Distribution date",
+  "notesOptional": "Notes (optional)",
+  "selectProjectFirst": "Select a project first.",
+  "noProductsRequested": "No products requested by users for this project.",
+  "pleaseSelectProjectStore": "Please select project, store, and add at least one product.",
+  "distributionCreated": "Distribution created. Material Request: {mr}",
+  "@distributionCreated": {
+    "placeholders": {
+      "mr": {"type": "String"}
+    }
+  },
+  "noProductsAdded": "No products added. Tap Add to add products.",
+  "selectProjectFirstShort": "Select project first",
+  "noProductsRequestedShort": "No products requested",
+  "pleaseEnterQuantity": "Please enter a quantity greater than 0",
+
+  "deleteDistribution": "Delete Distribution",
+  "refuseDistribution": "Refuse Distribution",
+  "validateDistribution": "Validate Distribution",
+  "approve": "Approve",
+  "validate": "Validate",
+  "refuse": "Refuse",
+
+  "search": "Search",
+  "searchHint": "Search {what}...",
+  "@searchHint": {
+    "placeholders": {
+      "what": {"type": "String"}
+    }
+  },
+  "searchUsersHint": "Search users...",
+  "searchProductsHint": "Search products...",
+  "searchOrdersHint": "Search orders...",
+  "searchProjectsHint": "Search projects...",
+  "searchStoresHint": "Search stores...",
+  "searchDistributionsHint": "Search distributions...",
+  "noDistributionsMatch": "No distributions match your search.",
+  "noDistributionsCreateHint": "No distributions yet. Create distributions via the API or add a form.",
+  "notifications": "Notifications",
+  "distributionAccepted": "Distribution accepted. Material Request: {bon}",
+  "@distributionAccepted": {
+    "placeholders": {
+      "bon": {"type": "String"}
+    }
+  },
+  "distributionRefused": "Distribution refused. Material Request: {bon}",
+  "@distributionRefused": {
+    "placeholders": {
+      "bon": {"type": "String"}
+    }
+  },
+
+  "noDistributions": "No distributions yet.",
+  "noOrders": "No orders yet.",
+  "noOrdersYetUser": "No orders yet.\nYour orders will appear here.",
+  "noResultsFor": "No results for \"{query}\"",
+  "@noResultsFor": {
+    "placeholders": {
+      "query": {"type": "String"}
+    }
+  },
+  "noProjects": "No projects yet.",
+  "noStores": "No stores yet.",
+  "noStoresMatch": "No stores match your search.",
+  "noStoresTapAdd": "No stores yet. Tap + to add one.",
+  "noProducts": "No products yet.",
+  "noProductsYet": "No products yet",
+  "tapToAddFirstProduct": "Tap + to add your first product",
+  "noProductsMatchSearch": "No products match your search",
+  "tryDifferentSearch": "Try a different search term",
+  "noUsers": "No users yet.",
+
+  "confirmDelete": "Are you sure? This action cannot be undone.",
+  "confirmDeleteItem": "Are you sure you want to delete \"{name}\"? This action cannot be undone.",
+  "@confirmDeleteItem": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "deleteUser": "Delete User",
+  "deleteProduct": "Delete Product",
+  "deleteProject": "Delete Project",
+  "confirmDeleteProject": "Are you sure you want to delete \"{name}\"? Users assigned to this project will be unassigned. This action cannot be undone.",
+  "@confirmDeleteProject": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "deleteOrder": "Delete Order",
+  "display": "Display",
+  "approveOrder": "Approve Order",
+  "approveSupplementaryRequest": "Approve supplementary request",
+  "refuseSupplementaryRequest": "Refuse supplementary request",
+  "refuseSupplementaryRequestQuestion": "Refuse this supplementary request?",
+  "selectStoreToDeduct": "Select store to deduct stock from:",
+  "stockDeductedFromStore": "Stock will be deducted from this store.",
+  "orderApproved": "Order approved. Stock deducted.",
+  "orderDeleted": "Order deleted.",
+  "rejectOrder": "Reject Order",
+  "rejectOrderQuestion": "Reject this order? The project quota will be restored.",
+  "orderRejected": "Order rejected. Project quota restored.",
+  "supplementaryRequestApproved": "Supplementary request approved",
+  "supplementaryRequestRefused": "Supplementary request refused",
+  "noSupplementaryRequests": "No supplementary requests",
+  "noStoresAvailable": "No stores available",
+  "productsLabel": "Products:",
+  "productsAdditional": "Products (additional quantities):",
+  "user": "User:",
+  "order": "Order",
+  "orderStatusPending": "Pending",
+  "orderStatusCompleted": "Completed",
+  "orderStatusRejected": "Rejected",
+  "orderQtyLabelProject": "(project)",
+  "orderQtyLabelSupplementary": "(supplementary)",
+  "orderDate": "Order date:",
+  "orderDateValue": "Order date: {date}",
+  "@orderDateValue": {
+    "placeholders": {
+      "date": {"type": "String"}
+    }
+  },
+  "projectLabel": "Project: {name}",
+  "@projectLabel": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "userLabel": "User: {name}",
+  "@userLabel": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "approvedQuantities": "Approved quantities (by admin):",
+  "noProductsLabel": "No products",
+  "myOrders": "My Orders",
+  "newOrder": "New Order",
+  "addProductSmall": "Add product",
+  "allProductsAdded": "All products have been added.",
+  "addAtLeastOneProduct": "Add at least one product with quantity > 0",
+  "orderPlacedSuccess": "Order placed successfully",
+  "placeOrder": "Place Order",
+  "supplementary": "Supplementary",
+  "notesLabel": "Notes: {notes}",
+  "@notesLabel": {
+    "placeholders": {
+      "notes": {"type": "String"}
+    }
+  },
+  "noOrdersMatch": "No orders match your search.",
+  "noProjectsMatch": "No projects match your search.",
+  "noProjectsTapAdd": "No projects yet. Tap + to add one.",
+  "addDamagedProduct": "Add Damaged Product",
+  "allProductsAlreadyAdded": "All products are already added.",
+  "addProductsStoresFirst": "Add products, stores, and projects first.",
+  "variantsLabel": "Variants ({unit})",
+  "@variantsLabel": {
+    "placeholders": {
+      "unit": {"type": "String"}
+    }
+  },
+  "editItem": "Edit {name}",
+  "@editItem": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "maxQty": "Max qty:",
+  "active": "Active",
+  "inactive": "Inactive",
+  "addVariants": "Add Variants",
+  "other": "Other",
+  "done": "Done",
+  "addOtherVariant": "Add other variant",
+  "selectCategory": "Select category",
+  "browseImage": "Browse image from computer",
+  "editProduct": "Edit Product",
+  "nameArOptional": "Arabic name (optional)",
+  "productImageSection": "Image",
+  "unitRequired": "Unit *",
+  "unitHint": "e.g. piece, kg, m²",
+  "categoryRequired": "Category *",
+  "productVariantsTitle": "Variants",
+  "selectCategoryFirstForVariants": "Select a category above to add variants",
+  "variantNameLabel": "Variant name",
+  "variantNameHint": "e.g. Custom 100",
+  "addVariantsDescription": "Select from predefined list or add custom",
+  "tapToSelectImage": "Tap to select image",
+  "productCategoryRetainingWall": "Retaining Wall System",
+  "productCategoryGeocell": "Geocell",
+  "productCategoryGeogrid": "Geogrid",
+  "productCategoryOther": "Other",
+  "roleUser": "User",
+  "roleAdmin": "Admin",
+  "roleWarehouse": "Warehouse User",
+  "none": "-- None --",
+  "description": "Description",
+  "owner": "Owner",
+  "usersAssigned": "Users assigned",
+  "deleteOrderLabel": "Delete order",
+  "approved": "Approved",
+  "refused": "Refused",
+  "reason": "Reason",
+  "reasonRequired": "Reason *",
+  "damagedProductAdded": "Damaged product added",
+  "noDamagedProducts": "No damaged products yet",
+  "distributionDateLabel": "Distribution date:",
+  "createdDate": "Created date:",
+  "validatedDate": "Validated date:",
+  "approvedDate": "Approved date:",
+  "materialRequest": "Material Request:",
+  "creationDate": "Creation date:",
+  "productCreationDate": "Product creation date:",
+  "returnDateByUser": "Return date by user:",
+  "cannotDeleteItem": "Cannot delete this item",
+  "deleteQuestion": "Delete",
+  "deleteItemQuestion": "Delete this {type}?",
+  "@deleteItemQuestion": {
+    "placeholders": {
+      "type": {"type": "String"}
+    }
+  },
+  "deletedSuccess": "Deleted successfully",
+  "category": "Category",
+  "availableColors": "Available variants",
+  "unit": "Unit",
+  "manufacturer": "Manufacture",
+  "distributor": "Distributor",
+  "storesDepots": "Stores / Depots",
+  "projectsTitle": "Projects",
+  "projectsManagement": "Projects Management",
+  "usersManagement": "Users Management",
+  "noUsersTapAdd": "No users yet. Tap + to add one.",
+  "noUsersMatch": "No users match your search.",
+  "deactivate": "Deactivate",
+  "activate": "Activate",
+  "confirmDeleteDistribution": "Delete distribution \"{name}\"? This action cannot be undone.",
+  "@confirmDeleteDistribution": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "refuseDistributionQuestion": "Refuse distribution \"{name}\"? This will not deduct any stock.",
+  "@refuseDistributionQuestion": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "validateDistributionQuestion": "Validate distribution \"{name}\"? This will deduct stock from the store.",
+  "@validateDistributionQuestion": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "orderApprovedCreateDist": "Order approved – Create distribution",
+  "distributionDateValue": "Distribution date: {date}",
+  "@distributionDateValue": {
+    "placeholders": {
+      "date": {"type": "String"}
+    }
+  },
+  "approveReturn": "Approve Return",
+  "approveDamagedProduct": "Approve Damaged Product",
+  "approveDamagedProductQuestion": "Approve \"{name}\" (qty: {qty})? This will deduct stock from the store.",
+  "@approveDamagedProductQuestion": {
+    "placeholders": {
+      "name": {"type": "String"},
+      "qty": {"type": "int"}
+    }
+  },
+  "totalGlobalStock": "Total Global Stock",
+  "deleteStore": "Delete Store",
+  "addQuantityFor": "Add quantity - {name}",
+  "@addQuantityFor": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "addStock": "Add Stock",
+  "editStock": "Edit Stock",
+  "editStockSelectedVariant": "Selected variant",
+  "deleteStock": "Delete Stock",
+  "updateQuantity": "Update Quantity",
+  "addProductToReturn": "Add product to return",
+  "newReturn": "New Return",
+  "pleaseSelectCategory": "Please select a category",
+  "imageUploadFailedSaving": "Image upload failed. Saving with {type} image.",
+  "@imageUploadFailedSaving": {
+    "placeholders": {
+      "type": {"type": "String"}
+    }
+  },
+  "qtyLabel": "Qty:",
+  "requested": "Requested",
+  "distributed": "Distributed",
+  "stockRecordDeleted": "Stock record deleted",
+  "noStockMatchSearch": "No stock records match your search.",
+  "imageUploadFailed": "Image upload failed. Saving with {type} image.",
+  "@imageUploadFailed": {
+    "placeholders": {
+      "type": {"type": "String"}
+    }
+  },
+  "stockDetails": "Stock Details",
+  "deleteStockRecordQuestion": "Delete stock record for \"{product}\" at {store}? Quantity: {qty}. This action cannot be undone.",
+  "@deleteStockRecordQuestion": {
+    "placeholders": {
+      "product": {"type": "String"},
+      "store": {"type": "String"},
+      "qty": {"type": "String"}
+    }
+  },
+  "noStockYet": "No stock records yet.",
+  "tapToAddStock": "Tap + to add stock for a product in a store.",
+  "stockManagement": "Stock Management",
+  "stockDistinctProductsCount": "Products in stock: {count}",
+  "@stockDistinctProductsCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "stockSearchMatchCount": "Matches: {count}",
+  "@stockSearchMatchCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "searchStockHint": "Search stock...",
+  "storesManagement": "Stores Management",
+  "location": "Location",
+  "locationOnMaps": "Location on maps",
+  "locationMapsHint": "Address, coordinates, or paste a Google Maps link",
+  "enterLocationForMaps": "Enter a location first",
+  "mapsOpenFailed": "Could not open maps. Check the link or try again.",
+  "deleteOrderRestoreStock": "Delete this order? Stock will be restored to the store.",
+  "deleteOrderSimple": "Delete this order?",
+  "reject": "Reject",
+  "addProductsAndStoresFirst": "Add products and stores first.",
+  "variant": "Variant",
+  "variantOrColor": "Variants",
+  "color": "Variants",
+
+  "addProject": "Add Project",
+  "editProject": "Edit Project",
+  "nameRequired": "Name *",
+  "nameEnglishRequired": "Name (English) *",
+  "projectOwner": "Project Owner",
+  "projectOwnerArabic": "Project Owner (Arabic)",
+  "projectBoqDate": "B.O.Q date",
+  "projectBoqCreationDateRequired": "B.O.Q creation date *",
+  "projectLastEditDateLabel": "Last project update",
+  "productsQuantitiesHint": "Products (quantities users can order)",
+  "required": "Required",
+  "maxQuantityUsersCanOrder": "Max quantity (users can order)",
+  "selectProduct": "Select product...",
+  "status": "Status",
+
+  "addStore": "Add Store",
+  "editStore": "Edit Store",
+
+  "appTitle": "Stock Management",
+  "noItemsMatchSearch": "No items match your search.",
+  "materialRequestLabel": "Material Request:",
+  "andMore": "... and more",
+  "retryButton": "Retry",
+  "ok": "OK",
+  "selectProductsQuantities": "Select products and quantities",
+  "noProductsAvailableForProject": "No products available for your project",
+  "contactAdminAddProducts": "Contact your admin to add products to your project",
+  "quantityAddedSuccess": "Quantity added successfully",
+  "couldNotLoadProduct": "Could not load product",
+  "viewProduct": "View product",
+  "selectStoreUndamagedProducts": "Select store where undamaged products will be added:",
+  "goodStoreOriginDamagedSelected": "Good → store of origin | Damaged → selected store",
+  "returnApprovedUndamagedAdded": "Return approved. Undamaged products added to warehouse.",
+  "approveAddUndamagedWarehouse": "Approve (add undamaged to warehouse)",
+  "returnsFromUsersAppear": "Returns from users will appear here.",
+  "noReturnsYet": "No returns yet.",
+  "returnSubmittedSuccess": "Return submitted successfully",
+  "submitReturn": "Submit Return",
+  "myReturns": "My Returns",
+  "quantityLabel": "Quantity:",
+  "reasonLabel": "Reason:",
+  "storeLabel": "Store:",
+  "notesLabelShort": "Notes:",
+  "goodCondition": "Good",
+  "damagedCondition": "Damaged",
+  "noStoresAddFirst": "No stores available. Add stores first.",
+  "goodConditionReturnOrigin": "Good condition products return to their store of origin (from product config).",
+  "selectStoreDamagedFallback": "Select store for damaged products and as fallback if product has no store:",
+  "supplementaryRequestsTitle": "Supplementary requests",
+  "damagedProduct": "Damaged product",
+  "stockChange": "Stock change",
+  "reportDateByUser": "Report date by user:",
+  "orderDateRequired": "Order date *",
+  "noItemsFound": "No {type} found.",
+  "@noItemsFound": {
+    "placeholders": {
+      "type": {"type": "String"}
+    }
+  },
+  "quantityToAdd": "Quantity to add",
+  "storeRequired": "Store *",
+  "validationRequiredByAdmin": "Validation required by Admin only",
+  "selectProductsToReturn": "Select products and quantities to return",
+  "conditionLabel": "Condition",
+  "userRequestedAdditionalQuantities": "{name} requested additional quantities",
+  "@userRequestedAdditionalQuantities": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "searchReturnsHint": "Search returns...",
+  "noReturnsMatch": "No returns match your search.",
+  "requestLabel": "Request",
+  "userFallback": "User",
+
+  "addUser": "Add User",
+  "editUser": "Edit User",
+  "name": "Name",
+  "role": "Role",
+  "projectOptional": "Project (optional)",
+  "minimum6Characters": "Minimum 6 characters",
+
+  "maxQtyFormatted": "Max: {max} {unit}",
+  "@maxQtyFormatted": {
+    "placeholders": {
+      "max": {"type": "String"},
+      "unit": {"type": "String"}
+    }
+  },
+  "notAssignedToProject": "You are not assigned to any project. Contact your admin.",
+  "approvedByLabel": "Approved by: {name}",
+  "@approvedByLabel": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "createdByLabel": "Created by: {name}",
+  "@createdByLabel": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "validatedByLabel": "Validated by: {name}",
+  "@validatedByLabel": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "statusWithValue": "Status: {status}",
+  "@statusWithValue": {
+    "placeholders": {
+      "status": {"type": "String"}
+    }
+  },
+  "returnWithProject": "Return • {project}",
+  "@returnWithProject": {
+    "placeholders": {
+      "project": {"type": "String"}
+    }
+  },
+  "returnItem": "Return",
+  "searchDamagedHint": "Search damaged...",
+  "noDamagedProductsReportedYet": "No damaged products reported yet",
+  "yourDamagedReportsWillAppear": "Your reports will appear here",
+  "extraQuantityPart": "(extra: +{qty})",
+  "@extraQuantityPart": {
+    "placeholders": {
+      "qty": {"type": "String"}
+    }
+  },
+  "noApprovedOrdersToDistribute": "No approved orders to distribute",
+  "whenAdminApprovesOrderHint": "When admin approves an order, it will appear here with quantities.\nUse + to create a distribution manually.",
+  "orderNumberPrefix": "Order #{prefix}...",
+  "@orderNumberPrefix": {
+    "placeholders": {
+      "prefix": {"type": "String"}
+    }
+  },
+  "orderCardProductsSummary": "{count} products • {total} total",
+  "@orderCardProductsSummary": {
+    "placeholders": {
+      "count": {"type": "int"},
+      "total": {"type": "int"}
+    }
+  },
+  "productsRequiredLabel": "Products *",
+  "qtyWithOptionalColor": "Qty: {qty}{suffix}",
+  "@qtyWithOptionalColor": {
+    "placeholders": {
+      "qty": {"type": "String"},
+      "suffix": {"type": "String"}
+    }
+  },
+  "imageUploadFailedSavingExisting": "Image upload failed. Saving with existing image.",
+  "imageUploadFailedSavingNo": "Image upload failed. Saving without image.",
+  "returnsEmptySubtitle": "Your returns will appear here.\nTap + to create a new return.",
+  "administratorDisplayName": "Administrator",
+  "validatedStatus": "Validated",
+  "qtyReasonStatusLine": "Qty: {qty} • {reason} • {status}",
+  "@qtyReasonStatusLine": {
+    "placeholders": {
+      "qty": {"type": "String"},
+      "reason": {"type": "String"},
+      "status": {"type": "String"}
+    }
+  },
+  "reportRowItem": "Item {n}",
+  "@reportRowItem": {
+    "placeholders": {
+      "n": {"type": "int"}
+    }
+  },
+  "reportFieldCreatedAt": "Created at",
+  "reportFieldUpdatedAt": "Updated at",
+  "reportFieldApprovedAt": "Approved at",
+  "reportFieldApprovedBy": "Approved by",
+  "reportFieldReportedBy": "Reported by",
+  "reportFieldProductId": "Product ID",
+  "reportFieldProjectId": "Project ID",
+  "reportFieldStoreId": "Store ID",
+  "reportFieldUserId": "User ID",
+  "reportFieldDeliveryDate": "Delivery date",
+  "reportFieldSerialNumber": "Serial number",
+  "reportFieldBonAlimentation": "Material request ref.",
+  "reportFieldType": "Type",
+  "reportFieldPhone": "Phone",
+  "reportFieldAddress": "Address",
+  "reportFieldImage": "Image",
+  "reportFieldRole": "Role",
+  "reportFieldProduct": "Product",
+  "reportFieldColor": "Variants",
+  "reportFieldCondition": "Condition",
+  "reportFieldExtraQuantity": "Extra quantity",
+  "reportFieldOrderId": "Order ID",
+  "reportFieldReturnId": "Return ID",
+  "reportFieldDistributionId": "Distribution ID",
+  "reportFieldQuantity": "Quantity",
+  "reportFieldTotal": "Total",
+  "reportFieldPrice": "Price",
+  "reportFieldAmount": "Amount",
+  "reportFieldDetails": "Details",
+  "reportFieldTitle": "Title",
+  "reportFieldCode": "Code",
+  "reportFieldReference": "Reference",
+  "reportFieldLocation": "Location",
+  "reportFieldDate": "Date",
+  "reportFieldTime": "Time",
+  "reportFieldComment": "Comment",
+  "reportFieldPriority": "Priority",
+  "reportFieldSource": "Source",
+  "reportFieldDestination": "Destination",
+  "reportFieldValue": "Value",
+  "reportFieldKey": "Field",
+  "reportFieldNotes": "Notes",
+  "reportFieldUnknown": "{key}",
+  "@reportFieldUnknown": {
+    "placeholders": {
+      "key": {"type": "String"}
+    }
+  },
+  "distributionSingle": "Distribution",
+  "removeTooltip": "Remove",
+  "qtyShort": "Qty",
+  "allocatedWithUnit": "Allocated: {allocated} {unit}",
+  "@allocatedWithUnit": {
+    "placeholders": {
+      "allocated": {"type": "String"},
+      "unit": {"type": "String"}
+    }
+  },
+  "allocatedDropdownSuffix": " (allocated: {n})",
+  "@allocatedDropdownSuffix": {
+    "placeholders": {
+      "n": {"type": "String"}
+    }
+  },
+  "supplementaryRequestMoreHint": "You can request more (supplementary, requires admin approval)",
+  "orderQuantitySupplementaryHint": "Min: 1, e.g. {example} for supplementary",
+  "@orderQuantitySupplementaryHint": {
+    "placeholders": {
+      "example": {"type": "String"}
+    }
+  },
+  "allocatedSummaryWithExtra": "Allocated: {allocated} {unit} • +{extra} extra",
+  "@allocatedSummaryWithExtra": {
+    "placeholders": {
+      "allocated": {"type": "String"},
+      "unit": {"type": "String"},
+      "extra": {"type": "String"}
+    }
+  },
+  "productNameWithMaxQty": "{name} (max: {max})",
+  "@productNameWithMaxQty": {
+    "placeholders": {
+      "name": {"type": "String"},
+      "max": {"type": "String"}
+    }
+  },
+  "maxQtyHintNumber": "Max: {max}",
+  "@maxQtyHintNumber": {
+    "placeholders": {
+      "max": {"type": "String"}
+    }
+  }
+}
