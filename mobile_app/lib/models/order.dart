@@ -2,6 +2,8 @@ class Order {
   final String id;
   final OrderUser? user;
   final OrderRef? project;
+  /// Store or depot id chosen when admin approved the order (API: `approvedStoreId`).
+  final String? approvedStoreId;
   final List<OrderProduct> products;
   final String status;
   final String? notes;
@@ -13,6 +15,7 @@ class Order {
     required this.id,
     this.user,
     this.project,
+    this.approvedStoreId,
     required this.products,
     required this.status,
     this.notes,
@@ -30,6 +33,7 @@ class Order {
       project: json['project'] != null
           ? OrderRef.fromJson(Map<String, dynamic>.from(json['project']))
           : null,
+      approvedStoreId: json['approvedStoreId']?.toString() ?? json['approved_store_id']?.toString(),
       products: (json['products'] as List?)?.map((p) => OrderProduct.fromJson(Map<String, dynamic>.from(p))).toList() ?? [],
       status: json['status'] ?? 'pending',
       notes: json['notes'],

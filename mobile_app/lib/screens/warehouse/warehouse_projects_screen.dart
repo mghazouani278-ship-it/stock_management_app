@@ -15,7 +15,7 @@ class WarehouseProjectsScreen extends StatefulWidget {
   State<WarehouseProjectsScreen> createState() => _WarehouseProjectsScreenState();
 }
 
-class _WarehouseProjectsScreenState extends State<WarehouseProjectsScreen> {
+class _WarehouseProjectsScreenState extends State<WarehouseProjectsScreen> with WidgetsBindingObserver {
   final ApiService _apiService = ApiService();
   List<Project> _projects = [];
   bool _loading = true;
@@ -24,7 +24,21 @@ class _WarehouseProjectsScreenState extends State<WarehouseProjectsScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadProjects();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      _loadProjects();
+    }
   }
 
   Future<void> _loadProjects() async {
@@ -132,13 +146,19 @@ class _WarehouseProjectsScreenState extends State<WarehouseProjectsScreen> {
               if (project.products != null && project.products!.isNotEmpty) ...[
                 const SizedBox(height: 16),
                 Text(l10n.products, style: const TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 4),
+                Text(
+                  l10n.projectQuantitiesNotStockHint,
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
                 const SizedBox(height: 8),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: project.products!.map((p) {
-                    final requested = p.requestedQuantity; // Quantité initiale demandée
-                    final remaining = p.allowedQuantity; // Quantité restante (décrémentée à chaque validation)
-                    final distQty = requested - remaining; // Distribué = demandé - restant
+                    final requested = p.requestedQuantity;
+                    final supplementary = p.supplementaryQuantity;
+                    final distQty = p.distributedQuantity.clamp(0, requested);
+                    final supplementaryDisplay = distQty >= requested ? supplementary : 0;
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 8),
                           child: Card(
@@ -161,12 +181,12 @@ class _WarehouseProjectsScreenState extends State<WarehouseProjectsScreen> {
                                     runSpacing: 6,
                                     crossAxisAlignment: WrapCrossAlignment.center,
                                     children: [
-                                      _buildQuantityChip(l10n.requested, requested, Colors.blue),
+                                      _buildQuantityChip(l10n.requestedBoq, requested, Colors.blue),
                                       _buildQuantityChip(l10n.distributed, distQty, Colors.green),
                                     ],
                                   ),
                                   const SizedBox(height: 6),
-                                  _buildQuantityChip(l10n.supplementary, p.supplementaryQuantity, Colors.orange),
+                                  _buildQuantityChip(l10n.supplementary, supplementaryDisplay, Colors.orange),
                                 ],
                               ),
                             ),
@@ -211,6 +231,7 @@ class _WarehouseProjectsScreenState extends State<WarehouseProjectsScreen> {
     return RefreshIndicator(
       onRefresh: _loadProjects,
       child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16),
         itemCount: _projects.length,
         itemBuilder: (context, index) {
@@ -268,7 +289,6 @@ class _WarehouseProjectsScreenState extends State<WarehouseProjectsScreen> {
                       style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                     ),
                   ],
-                  const SizedBox(height: 4),
                   Row(
                     children: [
                       Chip(

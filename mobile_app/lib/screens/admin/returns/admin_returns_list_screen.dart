@@ -173,7 +173,7 @@ class _AdminReturnsListScreenState extends State<AdminReturnsListScreen> {
               const SizedBox(height: 8),
               Chip(
                 label: Text(localizedUiStatus(context, returnItem.status), style: const TextStyle(fontSize: 12)),
-                backgroundColor: (returnItem.status == 'approved' ? AppTheme.success : returnItem.status == 'rejected' ? AppTheme.error : Colors.orange).withOpacity(0.2),
+                backgroundColor: (returnItem.status == 'approved' ? AppTheme.success : returnItem.status == 'rejected' ? AppTheme.error : Colors.red).withOpacity(0.2),
               ),
               if (returnItem.project != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(l10n.projectLabel(returnItem.project!.displayName(context)), style: AppTheme.appTextStyle(context, color: AppTheme.textSecondary))),
               if (returnItem.user != null)
@@ -284,11 +284,11 @@ class _AdminReturnsListScreenState extends State<AdminReturnsListScreen> {
                     width: 48,
                     height: 48,
                     decoration: BoxDecoration(
-                      color: (r.status == 'approved' ? AppTheme.success : r.status == 'rejected' ? AppTheme.error : Colors.orange).withOpacity(0.2),
+                      color: (r.status == 'approved' ? AppTheme.success : r.status == 'rejected' ? AppTheme.error : Colors.red).withOpacity(0.2),
                       borderRadius: BorderRadius.circular(AppTheme.radiusMd),
                     ),
                     child: Center(
-                      child: Icon(r.status == 'approved' ? Icons.check : r.status == 'rejected' ? Icons.close : Icons.pending, color: r.status == 'approved' ? AppTheme.success : r.status == 'rejected' ? AppTheme.error : Colors.orange, size: 24),
+                      child: Icon(r.status == 'approved' ? Icons.check : r.status == 'rejected' ? Icons.close : Icons.pending, color: r.status == 'approved' ? AppTheme.success : r.status == 'rejected' ? AppTheme.error : Colors.red, size: 24),
                     ),
                   ),
                   const SizedBox(width: AppTheme.spaceMd),

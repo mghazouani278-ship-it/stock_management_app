@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const bcrypt = require('bcryptjs');
 const { getFirestore } = require('../firebase');
 const { protect, authorize } = require('../middleware/auth');
 const { toApi } = require('../utils/firestoreToApi');
@@ -53,7 +54,7 @@ router.get('/:id', protect, authorize('admin'), async (req, res) => {
 
 router.put('/:id', protect, authorize('admin'), async (req, res) => {
   try {
-    const { name, email, role, projectId, isActive, nameAr } = req.body;
+    const { name, email, role, projectId, isActive, nameAr, password } = req.body;
     const firestore = getFirestore();
     const ref = firestore.collection('users').doc(req.params.id);
     const doc = await ref.get();
@@ -70,6 +71,13 @@ router.put('/:id', protect, authorize('admin'), async (req, res) => {
     if (role != null) updates.role = role;
     if (isActive !== undefined) updates.is_active = isActive;
     if (projectId !== undefined) updates.project_id = role === 'user' ? projectId : null;
+    if (password != null && String(password).trim() !== '') {
+      const plain = String(password).trim();
+      if (plain.length < 6) {
+        return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
+      }
+      updates.password = await bcrypt.hash(plain, 10);
+    }
     if (Object.keys(updates).length) await ref.update(updates);
     const updated = await ref.get();
     const data = await userToApi(updated, firestore);

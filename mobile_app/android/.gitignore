@@ -12,3 +12,6 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+
+# Heap dumps (often huge; GitHub rejects files > 100 MB)
+*.hprof

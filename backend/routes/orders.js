@@ -11,6 +11,25 @@ function makeProductKey(productId, color) {
   return color ? `${productId}:${color}` : productId;
 }
 
+/** Merge duplicate product lines (same id + color) so one request cannot deduct twice. */
+function mergeOrderProductLines(productsBody) {
+  const map = new Map();
+  for (const item of productsBody) {
+    const productId = item.product?.id ?? item.product?._id ?? item.product;
+    const quantity = Number(item.quantity);
+    const color = (item.variant ?? item.color) ? String(item.variant ?? item.color).trim().toLowerCase() : null;
+    if (!productId || !quantity || quantity <= 0) return { error: 'Invalid product or quantity' };
+    const key = makeProductKey(productId, color);
+    const prev = map.get(key);
+    map.set(key, {
+      productId,
+      color,
+      quantity: (prev?.quantity || 0) + quantity,
+    });
+  }
+  return { lines: Array.from(map.values()) };
+}
+
 function toIso(t) {
   return t?.toDate?.()?.toISOString?.() ?? (typeof t === 'string' ? t : null);
 }
@@ -48,6 +67,7 @@ async function orderToApi(doc, firestore) {
     id: doc.id,
     user: userRef(userDoc),
     project: projectRef(projectDoc),
+    approvedStoreId: data.approved_store_id || null,
     products: await Promise.all(products),
     status: data.status,
     notes: data.notes,
@@ -106,77 +126,101 @@ router.post('/', protect, async (req, res) => {
     const projectId = req.user.role === 'admin' ? req.body.projectId : req.user.project_id;
     if (!projectId) return res.status(400).json({ success: false, message: 'Please provide a project' });
 
-    const firestore = getFirestore();
-    const projectDoc = await firestore.collection('projects').doc(projectId).get();
-    if (!projectDoc.exists) return res.status(404).json({ success: false, message: 'Project not found' });
-    const productsMap = projectDoc.data().products || {};
-    const validatedProducts = [];
-    const productsToDeduct = [];
-    for (const item of productsBody) {
-      const productId = item.product?.id ?? item.product?._id ?? item.product;
-      const quantity = item.quantity;
-      const color = (item.variant ?? item.color) ? String(item.variant ?? item.color).trim().toLowerCase() : null;
-      if (!productId || !quantity || quantity <= 0) return res.status(400).json({ success: false, message: 'Invalid product or quantity' });
-      const key = makeProductKey(productId, color);
-      const allowedRaw = productsMap[key];
-      if (allowedRaw === undefined) return res.status(400).json({ success: false, message: `Product ${productId}${color ? ` (${color})` : ''} is not assigned to this project` });
-      const allowed = parseProjectProductQty(allowedRaw);
-      const projectQty = Math.min(quantity, allowed);
-      const supplementaryQty = Math.max(0, quantity - allowed);
-      if (quantity > allowed) {
-        validatedProducts.push({ product: productId, quantity, supplementary: true, color, projectQuantity: projectQty, supplementaryQuantity: supplementaryQty });
-      } else {
-        validatedProducts.push({ product: productId, quantity, supplementary: false, color, projectQuantity: projectQty, supplementaryQuantity: supplementaryQty });
-        productsToDeduct.push({ product: productId, quantity, color });
-      }
-    }
+    const merged = mergeOrderProductLines(productsBody);
+    if (merged.error) return res.status(400).json({ success: false, message: merged.error });
+    const lines = merged.lines;
+    if (lines.length === 0) return res.status(400).json({ success: false, message: 'Please provide at least one product' });
 
+    const firestore = getFirestore();
     const projectRef = firestore.collection('projects').doc(projectId);
-    if (productsToDeduct.length > 0) {
+    const orderRef = firestore.collection('orders').doc();
+
+    let projectNameForNotif = null;
+
+    await firestore.runTransaction(async (transaction) => {
+      const projectDoc = await transaction.get(projectRef);
+      if (!projectDoc.exists) {
+        const e = new Error('Project not found');
+        e.code = 'NOT_FOUND';
+        throw e;
+      }
+      projectNameForNotif = projectDoc.data().name || null;
+      const productsMap = { ...(projectDoc.data().products || {}) };
+      const validatedProducts = [];
+      const productsToDeduct = [];
+      for (const line of lines) {
+        const { productId, color, quantity } = line;
+        const key = makeProductKey(productId, color);
+        const allowedRaw = productsMap[key];
+        if (allowedRaw === undefined) {
+          const e = new Error(`Product ${productId}${color ? ` (${color})` : ''} is not assigned to this project`);
+          e.code = 'BAD_PRODUCT';
+          throw e;
+        }
+        const allowed = parseProjectProductQty(allowedRaw);
+        const projectQty = Math.min(quantity, allowed);
+        const supplementaryQty = Math.max(0, quantity - allowed);
+        if (quantity > allowed) {
+          validatedProducts.push({ product: productId, quantity, supplementary: true, color, projectQuantity: projectQty, supplementaryQuantity: supplementaryQty });
+        } else {
+          validatedProducts.push({ product: productId, quantity, supplementary: false, color, projectQuantity: projectQty, supplementaryQuantity: supplementaryQty });
+          productsToDeduct.push({ product: productId, quantity, color });
+        }
+      }
+
       const newProductsMap = { ...productsMap };
       for (const item of productsToDeduct) {
         const key = makeProductKey(item.product, item.color);
         const current = newProductsMap[key] ?? 0;
         newProductsMap[key] = setProjectMapQty(current, parseProjectProductQty(current) - item.quantity);
       }
-      await projectRef.update({
-        products: newProductsMap,
+
+      const ordDate = orderDate ? new Date(orderDate) : admin.firestore.FieldValue.serverTimestamp();
+      const productsForStorage = validatedProducts.map(({ product, quantity, supplementary, color, projectQuantity, supplementaryQuantity }) => ({
+        product,
+        quantity,
+        supplementary: supplementary || false,
+        color: color || null,
+        projectQuantity: projectQuantity ?? quantity,
+        supplementaryQuantity: supplementaryQuantity ?? 0,
+      }));
+
+      if (productsToDeduct.length > 0) {
+        transaction.update(projectRef, {
+          products: newProductsMap,
+          updated_at: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
+
+      transaction.set(orderRef, {
+        user_id: req.user.id,
+        project_id: projectId,
+        status: 'pending',
+        notes: notes || null,
+        order_date: ordDate,
+        products: productsForStorage,
+        created_at: admin.firestore.FieldValue.serverTimestamp(),
         updated_at: admin.firestore.FieldValue.serverTimestamp(),
       });
-    }
+    });
 
-    const ordDate = orderDate ? new Date(orderDate) : admin.firestore.FieldValue.serverTimestamp();
-    const productsForStorage = validatedProducts.map(({ product, quantity, supplementary, color, projectQuantity, supplementaryQuantity }) => ({
-      product,
-      quantity,
-      supplementary: supplementary || false,
-      color: color || null,
-      projectQuantity: projectQuantity ?? quantity,
-      supplementaryQuantity: supplementaryQuantity ?? 0,
-    }));
-    const ref = await firestore.collection('orders').add({
-      user_id: req.user.id,
-      project_id: projectId,
-      status: 'pending',
-      notes: notes || null,
-      order_date: ordDate,
-      products: productsForStorage,
-      created_at: admin.firestore.FieldValue.serverTimestamp(),
-      updated_at: admin.firestore.FieldValue.serverTimestamp(),
-    });
-    const doc = await ref.get();
+    const doc = await orderRef.get();
     const data = await orderToApi(doc, firestore);
-    await createOrderNotification(firestore, {
-      type: 'new_order',
-      orderId: ref.id,
-      projectId,
-      userId: req.user.id,
-      userName: req.user.name,
-      targetRole: 'admin',
-      projectName: projectDoc.data().name || null,
-    });
+    for (const targetRole of ['warehouse_user', 'warehouse']) {
+      await createOrderNotification(firestore, {
+        type: 'new_order',
+        orderId: orderRef.id,
+        projectId,
+        userId: req.user.id,
+        userName: req.user.name,
+        targetRole,
+        projectName: projectNameForNotif,
+      });
+    }
     res.status(201).json({ success: true, data });
   } catch (error) {
+    if (error.code === 'NOT_FOUND') return res.status(404).json({ success: false, message: error.message });
+    if (error.code === 'BAD_PRODUCT') return res.status(400).json({ success: false, message: error.message });
     res.status(500).json({ success: false, message: error.message });
   }
 });

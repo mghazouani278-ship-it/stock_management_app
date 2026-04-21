@@ -7,6 +7,7 @@ import '../../../services/api_service.dart';
 import '../../../widgets/app_search_bar.dart';
 import '../../../widgets/connection_error_widget.dart';
 import '../../../widgets/count_badge.dart';
+import '../../../utils/l10n_formatters.dart';
 import '../../../utils/product_localized.dart';
 import '../../../utils/project_localized.dart';
 import '../../../utils/project_report_pdf.dart';
@@ -145,13 +146,26 @@ class _ProjectsListScreenState extends State<ProjectsListScreen> {
               if (project.products != null && project.products!.isNotEmpty) ...[
                 const SizedBox(height: 16),
                 Text(l10n.products, style: const TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 4),
+                Text(
+                  l10n.projectQuantitiesNotStockHint,
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
                 const SizedBox(height: 8),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: project.products!.map((p) {
                     final requested = p.requestedQuantity; // Quantité initiale demandée
-                    final remaining = p.allowedQuantity; // Quantité restante (décrémentée à chaque validation)
-                    final distQty = requested - remaining; // Distribué = demandé - restant
+                    final supplementary = p.supplementaryQuantity;
+                    // Use raw distributed for supplementary overflow, but keep displayed distributed capped at requested.
+                    final distRaw = p.distributedQuantity;
+                    final distQty = distRaw >= requested ? requested : distRaw;
+                    final supplementaryFromDistribution = distRaw > requested ? (distRaw - requested) : 0;
+                    // If extra has already been physically distributed, show that real extra amount.
+                    // Otherwise fallback to supplementary counter once BOQ requested is fully distributed.
+                    final supplementaryDisplay = supplementaryFromDistribution > 0
+                        ? supplementaryFromDistribution
+                        : (distQty >= requested ? supplementary : 0);
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 8),
                           child: Card(
@@ -174,12 +188,12 @@ class _ProjectsListScreenState extends State<ProjectsListScreen> {
                                     runSpacing: 6,
                                     crossAxisAlignment: WrapCrossAlignment.center,
                                     children: [
-                                      _buildQuantityChip(context, l10n.requested, requested, Colors.blue),
+                                      _buildQuantityChip(context, l10n.requestedBoq, requested, Colors.blue),
                                       _buildQuantityChip(context, l10n.distributed, distQty, Colors.green),
                                     ],
                                   ),
                                   const SizedBox(height: 6),
-                                  _buildQuantityChip(context, l10n.supplementary, p.supplementaryQuantity, Colors.orange),
+                                  _buildQuantityChip(context, l10n.supplementary, supplementaryDisplay, Colors.orange),
                                 ],
                               ),
                             ),
@@ -252,6 +266,109 @@ class _ProjectsListScreenState extends State<ProjectsListScreen> {
     }
   }
 
+  Future<void> _showProjectPdfExportOptions(Map<String, dynamic> projectData) async {
+    final project = Project.fromJson(Map<String, dynamic>.from(projectData));
+    final createdStr = project.createdAt == null
+        ? '—'
+        : L10nFormatters.formatDateTime(context, project.createdAt!.toLocal());
+    final history = project.history ?? const <ProjectHistory>[];
+    final updates = <Map<String, dynamic>>[];
+    for (int i = 0; i < history.length; i++) {
+      final h = history[i];
+      if (h.action.toLowerCase() == 'updated' && h.at != null) {
+        updates.add({'index': i, 'at': h.at!});
+      }
+    }
+    updates.sort((a, b) => (a['at'] as DateTime).compareTo(b['at'] as DateTime));
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) {
+        final maxH = MediaQuery.sizeOf(ctx).height * 0.9;
+        return SafeArea(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: maxH),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.picture_as_pdf_outlined),
+                    title: const Text('Print full project PDF'),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      ProjectReportPdf.export(context, projectData, mode: ProjectReportPdf.modeFull);
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.date_range_outlined),
+                    title: const Text('Print creation date'),
+                    subtitle: Text(createdStr),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      ProjectReportPdf.export(
+                        context,
+                        projectData,
+                        mode: ProjectReportPdf.modeCreationOnly,
+                      );
+                    },
+                  ),
+                  for (int i = 0; i < updates.length; i++)
+                    ListTile(
+                      leading: const Icon(Icons.update_outlined),
+                      title: Text('Print project update #${i + 1}'),
+                      subtitle: Text(
+                        L10nFormatters.formatDateTime(
+                          context,
+                          (updates[i]['at'] as DateTime).toLocal(),
+                        ),
+                      ),
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        ProjectReportPdf.export(
+                          context,
+                          projectData,
+                          mode: ProjectReportPdf.modeLastUpdateOnly,
+                          historyIndex: updates[i]['index'] as int,
+                        );
+                      },
+                    ),
+                  ListTile(
+                    leading: const Icon(Icons.history_outlined),
+                    title: const Text('Print all modifications'),
+                    subtitle: const Text('Project history with all changes'),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      ProjectReportPdf.export(
+                        context,
+                        projectData,
+                        mode: ProjectReportPdf.modeAllModifications,
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     context.watch<LocaleProvider>();
@@ -286,19 +403,6 @@ class _ProjectsListScreenState extends State<ProjectsListScreen> {
           if (!mounted) return;
           if (result is Map && result['reload'] == true) {
             await _loadProjects();
-            final pdfData = result['projectPdf'];
-            if (pdfData is Map) {
-              final l10n = AppLocalizations.of(context)!;
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(l10n.projectSavedShort),
-                  action: SnackBarAction(
-                    label: l10n.reportExportProjectPdf,
-                    onPressed: () => ProjectReportPdf.export(context, Map<String, dynamic>.from(pdfData)),
-                  ),
-                ),
-              );
-            }
           }
         },
         child: const Icon(Icons.add),
@@ -361,7 +465,6 @@ class _ProjectsListScreenState extends State<ProjectsListScreen> {
                       style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                     ),
                   ],
-                  const SizedBox(height: 4),
                   Row(
                     children: [
                       Chip(
@@ -390,19 +493,6 @@ class _ProjectsListScreenState extends State<ProjectsListScreen> {
                     if (!mounted) return;
                     if (result is Map && result['reload'] == true) {
                       await _loadProjects();
-                      final pdfData = result['projectPdf'];
-                      if (pdfData is Map) {
-                        final l10n = AppLocalizations.of(context)!;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(l10n.projectSavedShort),
-                            action: SnackBarAction(
-                              label: l10n.reportExportProjectPdf,
-                              onPressed: () => ProjectReportPdf.export(context, Map<String, dynamic>.from(pdfData)),
-                            ),
-                          ),
-                        );
-                      }
                     }
                   } else if (value == 'delete') {
                     await _deleteProject(project);

@@ -78,6 +78,8 @@ class Project {
   final String? projectOwnerAr;
   /// ISO `yyyy-MM-dd` (API: `boqCreationDate` / `boq_creation_date`).
   final String? boqCreationDate;
+  /// Default depot/store for distributions (API: `depotId` / `depot_id`).
+  final String? depotId;
   /// API: `createdAt` / `created_at`
   final DateTime? createdAt;
   /// API: `updatedAt` / `updated_at`
@@ -96,6 +98,7 @@ class Project {
     this.projectOwner,
     this.projectOwnerAr,
     this.boqCreationDate,
+    this.depotId,
     this.createdAt,
     this.updatedAt,
     this.history,
@@ -116,6 +119,7 @@ class Project {
       projectOwner: (json['projectOwner'] ?? json['project_owner'])?.toString(),
       projectOwnerAr: (json['projectOwnerAr'] ?? json['project_owner_ar'])?.toString(),
       boqCreationDate: (json['boqCreationDate'] ?? json['boq_creation_date'])?.toString(),
+      depotId: json['depotId']?.toString() ?? json['depot_id']?.toString(),
       createdAt: parseProjectApiDate(json['createdAt'] ?? json['created_at']),
       updatedAt: parseProjectApiDate(json['updatedAt'] ?? json['updated_at']),
       history: json['history'] != null
@@ -146,6 +150,8 @@ class ProjectHistory {
   final String? byName;
   final String? byEmail;
   final List<String> changes;
+  /// Optional product state at this history point (API: `snapshot`).
+  final Map<String, dynamic>? snapshot;
 
   ProjectHistory({
     required this.action,
@@ -153,10 +159,12 @@ class ProjectHistory {
     this.byName,
     this.byEmail,
     this.changes = const [],
+    this.snapshot,
   });
 
   factory ProjectHistory.fromJson(Map<String, dynamic> json) {
     final by = json['by'];
+    final snap = json['snapshot'];
     return ProjectHistory(
       action: (json['action'] ?? 'updated').toString(),
       at: parseProjectApiDate(json['at'] ?? json['createdAt']),
@@ -165,8 +173,22 @@ class ProjectHistory {
       changes: json['changes'] is List
           ? (json['changes'] as List).map((e) => e.toString()).toList()
           : const [],
+      snapshot: snap is Map ? _normalizeHistorySnapshot(Map<String, dynamic>.from(snap)) : null,
     );
   }
+}
+
+/// Nested `products` / `products_requested` maps from JSON must be [Map<String, dynamic>]
+/// or [snapshot.products] is skipped as non-Map in the UI.
+Map<String, dynamic> _normalizeHistorySnapshot(Map<String, dynamic> snap) {
+  final out = Map<String, dynamic>.from(snap);
+  for (final key in ['products', 'products_requested']) {
+    final v = out[key];
+    if (v is Map) {
+      out[key] = Map<String, dynamic>.from(v);
+    }
+  }
+  return out;
 }
 
 class ProjectProduct {
@@ -175,6 +197,7 @@ class ProjectProduct {
   final int allowedQuantity;
   final int requestedQuantity;
   final int supplementaryQuantity;
+  final int distributedQuantity;
   final String? color;
   /// ISO date `yyyy-MM-dd` (API: `boqDate` / `boq_date`).
   final String? boqDate;
@@ -185,6 +208,7 @@ class ProjectProduct {
     required this.allowedQuantity,
     required this.requestedQuantity,
     this.supplementaryQuantity = 0,
+    this.distributedQuantity = 0,
     this.color,
     this.boqDate,
   });
@@ -200,6 +224,7 @@ class ProjectProduct {
       allowedQuantity: allowed,
       requestedQuantity: json['requestedQuantity'] ?? json['requested_quantity'] ?? allowed,
       supplementaryQuantity: json['supplementaryQuantity'] ?? json['supplementary_quantity'] ?? 0,
+      distributedQuantity: json['distributedQuantity'] ?? json['distributed_quantity'] ?? 0,
       color: json['color']?.toString(),
       boqDate: json['boqDate']?.toString() ?? json['boq_date']?.toString(),
     );

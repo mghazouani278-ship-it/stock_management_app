@@ -81,14 +81,18 @@ class _UserFormScreenState extends State<UserFormScreen> {
     });
     try {
       if (_isEdit) {
-        final res = await _apiService.put('/users/${widget.user!.id}', {
+        final payload = <String, dynamic>{
           'name': _nameController.text.trim(),
           'nameAr': _nameArController.text.trim().isEmpty ? null : _nameArController.text.trim(),
           'email': _emailController.text.trim().toLowerCase(),
           'role': _role,
           'projectId': _role == 'user' ? _projectId : null,
           'isActive': _isActive,
-        });
+        };
+        if (_passwordController.text.trim().isNotEmpty) {
+          payload['password'] = _passwordController.text.trim();
+        }
+        final res = await _apiService.put('/users/${widget.user!.id}', payload);
         if (res['success'] == true && context.mounted) {
           Navigator.pop(context, true);
         } else {
@@ -155,20 +159,22 @@ class _UserFormScreenState extends State<UserFormScreen> {
                 ),
                 validator: (v) => v == null || v.trim().isEmpty ? l10n.required : null,
               ),
-              if (!_isEdit) ...[
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _passwordController,
-                  obscureText: true,
-                  decoration: InputDecoration(
-                    labelText: l10n.password,
-                    border: const OutlineInputBorder(),
-                  ),
-                  validator: (v) =>
-                      v == null || v.length < 6 ? l10n.minimum6Characters : null,
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _passwordController,
+                obscureText: true,
+                decoration: InputDecoration(
+                  labelText: _isEdit ? '${l10n.password} (optional)' : l10n.password,
+                  border: const OutlineInputBorder(),
                 ),
-                const SizedBox(height: 16),
-              ],
+                validator: (v) {
+                  final value = (v ?? '').trim();
+                  if (!_isEdit) return value.length < 6 ? l10n.minimum6Characters : null;
+                  if (value.isNotEmpty && value.length < 6) return l10n.minimum6Characters;
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
               DropdownButtonFormField<String>(
                 value: _role,
                 decoration: InputDecoration(

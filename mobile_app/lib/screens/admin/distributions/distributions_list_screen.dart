@@ -33,6 +33,26 @@ class _DistributionsListScreenState extends State<DistributionsListScreen> {
   bool _loadingNotifications = true;
   String? _error;
   bool _showSearch = false;
+  String? _newestAdminDistributionId;
+  bool _newestAdminHighlightConsumed = false;
+
+  bool _isSuccessStatus(String status) {
+    final s = status.toLowerCase().trim();
+    return s == 'validated' || s == 'accepted' || s == 'completed';
+  }
+
+  bool _isErrorStatus(String status) {
+    final s = status.toLowerCase().trim();
+    return s == 'refused' || s == 'rejected' || s == 'cancelled';
+  }
+
+  void _consumeNewestHighlightIfMatch(Distribution dist) {
+    if (widget.hideValidate || _newestAdminHighlightConsumed) return;
+    if (_newestAdminDistributionId == null) return;
+    if (_newestAdminDistributionId != dist.id) return;
+    if (!mounted) return;
+    setState(() => _newestAdminHighlightConsumed = true);
+  }
 
   @override
   void initState() {
@@ -76,6 +96,9 @@ class _DistributionsListScreenState extends State<DistributionsListScreen> {
           _distributions = (res['data'] as List)
               .map((e) => Distribution.fromJson(Map<String, dynamic>.from(e)))
               .toList();
+          if (!widget.hideValidate && !_newestAdminHighlightConsumed && _distributions.isNotEmpty) {
+            _newestAdminDistributionId ??= _distributions.first.id;
+          }
           _loading = false;
         });
       } else {
@@ -268,11 +291,11 @@ class _DistributionsListScreenState extends State<DistributionsListScreen> {
               Text(
                 l10n.statusWithValue(localizedUiStatus(ctx, dist.status)),
                 style: TextStyle(
-                  color: dist.status == 'validated'
+                  color: _isSuccessStatus(dist.status)
                       ? Colors.green
-                      : dist.status == 'refused'
+                      : _isErrorStatus(dist.status)
                           ? Colors.red
-                          : Colors.orange,
+                          : const Color(0xFFC62828),
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -449,19 +472,34 @@ class _DistributionsListScreenState extends State<DistributionsListScreen> {
               ),
             )
           else
-            ...items.map((dist) => Card(
+            ...items.asMap().entries.map((entry) {
+              final dist = entry.value;
+              // Admin screen: highlight newest row until first admin click on it.
+              final isNewestAdminItem = !widget.hideValidate &&
+                  !_newestAdminHighlightConsumed &&
+                  _newestAdminDistributionId == dist.id;
+              final isPendingLike = !_isSuccessStatus(dist.status) && !_isErrorStatus(dist.status);
+              final forceRed = isNewestAdminItem;
+              return Card(
               margin: const EdgeInsets.only(bottom: 8),
+              color: (isPendingLike || forceRed)
+                  ? const Color(0xFFFFEBEE)
+                  : null,
               child: ListTile(
                 leading: CircleAvatar(
-                  backgroundColor: dist.status == 'validated'
+                  backgroundColor: forceRed
+                      ? Colors.red
+                      : _isSuccessStatus(dist.status)
                       ? Colors.green
-                      : dist.status == 'refused'
+                      : _isErrorStatus(dist.status)
                           ? Colors.red
-                          : Colors.orange,
+                          : const Color(0xFFC62828),
                   child: Icon(
-                    dist.status == 'validated'
+                    forceRed
+                        ? Icons.fiber_new
+                        : _isSuccessStatus(dist.status)
                         ? Icons.check
-                        : dist.status == 'refused'
+                        : _isErrorStatus(dist.status)
                             ? Icons.close
                             : Icons.pending,
                     color: Colors.white,
@@ -483,13 +521,22 @@ class _DistributionsListScreenState extends State<DistributionsListScreen> {
                       ),
                     Text(
                       localizedUiStatus(context, dist.status),
-                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: (isPendingLike || forceRed)
+                            ? const Color(0xFFC62828)
+                            : Colors.grey[600],
+                        fontWeight: (isPendingLike || forceRed)
+                            ? FontWeight.w600
+                            : FontWeight.normal,
+                      ),
                     ),
                   ],
                 ),
                 trailing: PopupMenuButton<String>(
                   icon: const Icon(Icons.more_vert),
                   onSelected: (value) async {
+                    _consumeNewestHighlightIfMatch(dist);
                     if (value == 'view') {
                       _showDetails(dist);
                     } else if (value == 'delete') {
@@ -523,9 +570,13 @@ class _DistributionsListScreenState extends State<DistributionsListScreen> {
                     ];
                   },
                 ),
-                onTap: () => _showDetails(dist),
+                onTap: () {
+                  _consumeNewestHighlightIfMatch(dist);
+                  _showDetails(dist);
+                },
               ),
-            )),
+            );
+            }),
         ],
       ),
     );

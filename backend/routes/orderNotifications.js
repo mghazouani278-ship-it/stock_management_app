@@ -6,6 +6,14 @@ const { protect, authorize } = require('../middleware/auth');
 
 /** Create order notification for admin (new order) or warehouse (approved/rejected) */
 async function createOrderNotification(firestore, { type, orderId, projectId, userId, userName, targetRole, status, products, projectName, storeId }) {
+  // Idempotency guard: avoid duplicate notifications for same event/target.
+  // This can happen on client retries or accidental double-submit.
+  const existing = await firestore.collection('order_notifications')
+    .where('order_id', '==', orderId)
+    .where('type', '==', type)
+    .where('target_role', '==', targetRole)
+    .limit(1)
+    .get();
   const doc = {
     type,
     order_id: orderId,
@@ -20,6 +28,15 @@ async function createOrderNotification(firestore, { type, orderId, projectId, us
   if (products && products.length > 0) doc.products = products;
   if (projectName) doc.project_name = projectName;
   if (storeId) doc.store_id = storeId;
+  if (!existing.empty) {
+    // Keep one notification per (order,type,target_role) but refresh payload so warehouse
+    // always receives latest approved products/quantities.
+    await existing.docs[0].ref.set({
+      ...doc,
+      updated_at: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+    return;
+  }
   await firestore.collection('order_notifications').add(doc);
 }
 

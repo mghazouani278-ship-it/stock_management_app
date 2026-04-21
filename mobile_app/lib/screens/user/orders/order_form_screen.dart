@@ -10,7 +10,10 @@ import '../../../theme/app_theme.dart';
 import '../../../widgets/app_card.dart';
 
 class OrderFormScreen extends StatefulWidget {
-  const OrderFormScreen({super.key});
+  const OrderFormScreen({super.key, this.projectId});
+
+  /// When set (e.g. admin creating an order), loads this project; otherwise uses the signed-in user's project.
+  final String? projectId;
 
   @override
   State<OrderFormScreen> createState() => _OrderFormScreenState();
@@ -30,7 +33,10 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
   @override
   void initState() {
     super.initState();
-    _loadProjectProducts();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _loadProjectProducts();
+    });
   }
 
   @override
@@ -49,7 +55,7 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
     });
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      final projectId = authProvider.user?.project?.id;
+      final projectId = widget.projectId ?? authProvider.user?.project?.id;
       if (projectId == null || projectId.isEmpty) {
         setState(() {
           _loading = false;
@@ -87,6 +93,20 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
     return int.tryParse(v.toString()) ?? 0;
   }
 
+  /// Remaining project quantity allocable to new orders for this line.
+  /// Prefer requested - distributed when available (more reliable than stale allowedQuantity).
+  int _remainingAllocatedFor(Map<String, dynamic> p) {
+    final allowed = _parseQuantity(p['allowedQuantity'] ?? p['allowed_quantity']);
+    final requested = _parseQuantity(p['requestedQuantity'] ?? p['requested_quantity']);
+    final distributed = _parseQuantity(p['distributedQuantity'] ?? p['distributed_quantity']);
+    if (requested > 0) {
+      final rem = requested - distributed;
+      if (rem <= 0) return 0;
+      return rem > requested ? requested : rem;
+    }
+    return allowed < 0 ? 0 : allowed;
+  }
+
   Future<void> _showAddProductDialog() async {
     if (_projectProducts.isEmpty) return;
     final alreadyAddedKeys = _selectedProducts.map((s) => _productKey(s['productId'] as String? ?? '', s['color'] as String?)).toSet();
@@ -99,10 +119,6 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context)!.allProductsAdded)));
       return;
     }
-    final first = available.first;
-    final fa = _parseQuantity(first['allowedQuantity'] ?? first['allowed_quantity']);
-    final fr = _parseQuantity(first['requestedQuantity'] ?? first['requested_quantity']);
-    final firstMax = fa > fr ? fa : fr;
     const initialQty = 0;
     String? selectedKey;
     final qtyController = TextEditingController(text: initialQty.toString());
@@ -119,16 +135,8 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
             (p) => _productKey(p['product']?['id'] ?? p['product']?['_id'] ?? '', p['color']?.toString()) == selectedKey,
             orElse: () => available.first,
           );
-          final allowed = _parseQuantity(selected['allowedQuantity'] ?? selected['allowed_quantity']);
-          final requested = _parseQuantity(selected['requestedQuantity'] ?? selected['requested_quantity']);
-          final maxQty = allowed > requested ? allowed : requested;
+          final allowed = _remainingAllocatedFor(selected);
           final unit = selected['product']?['unit'] ?? '';
-          final rawPn = selected['product']?['name']?.toString();
-          final name = rawPn != null && rawPn.trim().isNotEmpty
-              ? localizedApiProductName(ctx, rawPn)
-              : l10n.product;
-          final color = selected['color']?.toString();
-          final displayName = color != null && color.isNotEmpty ? '$name ($color)' : name;
           return AlertDialog(
             title: Text(l10n.addProductSmall),
             content: ConstrainedBox(
@@ -150,7 +158,7 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
                           : l10n.product;
                       final c = p['color']?.toString();
                       final key = _productKey(id, c);
-                      final a = _parseQuantity(p['allowedQuantity'] ?? p['allowed_quantity']);
+                      final a = _remainingAllocatedFor(p);
                       final label = c != null && c.isNotEmpty
                           ? '$n (${localizedVariantOrColorLabel(ctx, c)})'
                           : n;
@@ -169,13 +177,6 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
                       if (v != null) {
                         setDialogState(() {
                           selectedKey = v;
-                          final p = available.firstWhere(
-                            (x) => _productKey(x['product']?['id'] ?? x['product']?['_id'] ?? '', x['color']?.toString()) == v,
-                            orElse: () => available.first,
-                          );
-                          final na = _parseQuantity(p['allowedQuantity'] ?? p['allowed_quantity']);
-                          final nr = _parseQuantity(p['requestedQuantity'] ?? p['requested_quantity']);
-                          final newMax = na > nr ? na : nr;
                           qtyController.text = '0';
                         });
                       }
@@ -209,7 +210,7 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
               FilledButton(
                   onPressed: () {
                   var q = int.tryParse(qtyController.text) ?? 0;
-                  if (q <= 0 && maxQty > 0) q = maxQty;
+                  if (q <= 0 && allowed > 0) q = allowed;
                   if (q > 0 && selectedKey != null) {
                     final parts = selectedKey!.split('|');
                     final pid = parts.isNotEmpty ? parts[0] : '';
@@ -240,9 +241,7 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
             ? rawSel.trim()
             : AppLocalizations.of(context)!.product;
         final unit = selected['product']?['unit'] ?? '';
-        final sa = _parseQuantity(selected['allowedQuantity'] ?? selected['allowed_quantity']);
-        final sr = _parseQuantity(selected['requestedQuantity'] ?? selected['requested_quantity']);
-        final maxQty = sa > sr ? sa : sr;
+        final sa = _remainingAllocatedFor(selected);
         final ctrl = TextEditingController(text: qty.toString());
         final key = _productKey(id, color);
         _quantityControllers[key] = ctrl;
@@ -290,11 +289,17 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
     }
     setState(() => _submitting = true);
     try {
-      await _apiService.post('/orders', {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final effectiveProjectId = widget.projectId ?? authProvider.user?.project?.id;
+      final body = <String, dynamic>{
         'products': products,
         'orderDate': _orderDate.toIso8601String().split('T')[0],
         'notes': _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
-      });
+      };
+      if (authProvider.isAdmin && effectiveProjectId != null && effectiveProjectId.isNotEmpty) {
+        body['projectId'] = effectiveProjectId;
+      }
+      await _apiService.post('/orders', body);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(AppLocalizations.of(context)!.orderPlacedSuccess), backgroundColor: AppTheme.success),

@@ -507,6 +507,36 @@ abstract class AppLocalizations {
   /// **'Source (Store/Depot)'**
   String get sourceStoreDepot;
 
+  /// No description provided for @distributionSourceReadOnlyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Taken from the project depot or the approved order — no need to select.'**
+  String get distributionSourceReadOnlyHint;
+
+  /// No description provided for @distributionDepotUnresolved.
+  ///
+  /// In en, this message translates to:
+  /// **'No depot found. Set a depot on the project (admin) or open distribution from an approved order.'**
+  String get distributionDepotUnresolved;
+
+  /// No description provided for @setProjectDepotShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Set project depot'**
+  String get setProjectDepotShort;
+
+  /// No description provided for @projectDepotOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Store / depot (stock source)'**
+  String get projectDepotOptional;
+
+  /// No description provided for @projectDepotHelper.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional. Warehouse will use this depot for stock when creating distributions.'**
+  String get projectDepotHelper;
+
   /// No description provided for @selectLocationHint.
   ///
   /// In en, this message translates to:
@@ -542,6 +572,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Select a project first.'**
   String get selectProjectFirst;
+
+  /// No description provided for @selectSourceFirstShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Select source'**
+  String get selectSourceFirstShort;
+
+  /// No description provided for @noStockAtSelectedSource.
+  ///
+  /// In en, this message translates to:
+  /// **'No available quantity at the selected store or depot. Choose another source or check stock.'**
+  String get noStockAtSelectedSource;
+
+  /// No description provided for @quantityExceedsMax.
+  ///
+  /// In en, this message translates to:
+  /// **'Maximum allowed is {max}.'**
+  String quantityExceedsMax(String max);
 
   /// No description provided for @noProductsRequested.
   ///
@@ -1629,6 +1677,18 @@ abstract class AppLocalizations {
   /// **'Requested'**
   String get requested;
 
+  /// No description provided for @requestedBoq.
+  ///
+  /// In en, this message translates to:
+  /// **'Requested (BOQ)'**
+  String get requestedBoq;
+
+  /// No description provided for @projectQuantitiesNotStockHint.
+  ///
+  /// In en, this message translates to:
+  /// **'BOQ / project quantities — not warehouse stock.'**
+  String get projectQuantitiesNotStockHint;
+
   /// No description provided for @distributed.
   ///
   /// In en, this message translates to:
@@ -1832,6 +1892,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Last project update'**
   String get projectLastEditDateLabel;
+
+  /// No description provided for @reportFirstUpdateDateLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'First update date'**
+  String get reportFirstUpdateDateLabel;
 
   /// No description provided for @productsQuantitiesHint.
   ///

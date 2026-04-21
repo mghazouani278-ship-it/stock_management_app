@@ -164,7 +164,7 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
         color = Colors.red;
         break;
       default:
-        color = Colors.orange;
+        color = Colors.red;
     }
     return Chip(
       label: Text(localizedUiStatus(context, status), style: const TextStyle(fontSize: 12)),
@@ -332,7 +332,7 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
       case 'rejected':
         return Colors.red;
       default:
-        return Colors.orange;
+        return Colors.red;
     }
   }
 }

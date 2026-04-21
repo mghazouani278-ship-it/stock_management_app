@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../models/user.dart';
@@ -632,8 +633,11 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> with RouteAware
 
   Widget _projectProductCard(BuildContext context, ProjectProduct p, AppLocalizations l10n) {
     final requested = p.requestedQuantity;
-    final remaining = p.allowedQuantity;
-    final distQty = requested - remaining < 0 ? 0 : requested - remaining;
+    final distRaw = p.distributedQuantity;
+    final distQty = distRaw.clamp(0, requested).toInt();
+    // Rest (BOQ) = requested − covered toward BOQ (not stale allowedQuantity from Firestore).
+    final int remaining = distRaw >= requested ? 0 : requested - distRaw;
+    final supplementaryDisplay = distQty >= requested ? p.supplementaryQuantity : 0;
     return Padding(
       padding: const EdgeInsets.only(bottom: AppTheme.spaceSm),
       child: AppCard(
@@ -650,14 +654,158 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> with RouteAware
               spacing: 8,
               runSpacing: 6,
               children: [
-                _projectQtyChip(context, l10n.requested, requested, Colors.blue),
+                _projectQtyChip(context, l10n.requestedBoq, requested, Colors.blue),
                 _projectQtyChip(context, l10n.distributed, distQty, Colors.green),
                 _projectQtyChip(context, l10n.quantityRest, remaining, Colors.blueGrey),
-                _projectQtyChip(context, l10n.supplementary, p.supplementaryQuantity, Colors.orange),
+                _projectQtyChip(context, l10n.supplementary, supplementaryDisplay, Colors.orange),
               ],
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  String _historyProductKey(ProjectProduct p) {
+    final color = p.color?.trim();
+    if (color == null || color.isEmpty) return p.product;
+    return '${p.product}:$color';
+  }
+
+  int _historyQtyFromRaw(dynamic raw) {
+    if (raw == null) return 0;
+    if (raw is num) return raw.floor().clamp(0, 1 << 30);
+    if (raw is Map<String, dynamic>) {
+      final value = raw['allowed_quantity'] ?? raw['allowedQuantity'] ?? raw['quantity'];
+      return _historyQtyFromRaw(value);
+    }
+    return int.tryParse(raw.toString()) ?? 0;
+  }
+
+  List<Map<String, dynamic>> _historyProductsFromSnapshot(Project project, ProjectHistory h) {
+    final snap = h.snapshot;
+    if (snap == null) return const [];
+    final productsRaw = snap['products'];
+    if (productsRaw is! Map) return const [];
+    final productsMap = Map<String, dynamic>.from(productsRaw);
+    final requestedRaw = snap['products_requested'];
+    final requestedMap =
+        requestedRaw is Map ? Map<String, dynamic>.from(requestedRaw) : <String, dynamic>{};
+    final allKeys = <String>{
+      ...productsMap.keys.map((k) => k.toString()),
+      ...requestedMap.keys.map((k) => k.toString()),
+    };
+    final knownProducts = <String, ProjectProduct>{
+      for (final p in (project.products ?? const <ProjectProduct>[])) _historyProductKey(p): p,
+    };
+    final rows = <Map<String, dynamic>>[];
+    for (final key in allKeys) {
+      final rawAllowed = productsMap[key];
+      final rawReq = requestedMap[key];
+      if (rawAllowed == null && rawReq == null) continue;
+      final allowed = _historyQtyFromRaw(rawAllowed ?? rawReq);
+      final requested = _historyQtyFromRaw(rawReq ?? rawAllowed);
+      final rest = allowed;
+      final distributed = requested - rest < 0 ? 0 : requested - rest;
+      final p = knownProducts[key];
+      final label = p != null ? _formatProjectProductLine(context, p) : key;
+      final suppFromP = p?.supplementaryQuantity ?? 0;
+      final supplementary = suppFromP > 0 ? suppFromP : (requested > allowed ? requested - allowed : 0);
+      rows.add({
+        'label': label,
+        'requested': requested,
+        'distributed': distributed,
+        'rest': rest,
+        'supplementary': supplementary,
+      });
+    }
+    return rows;
+  }
+
+  List<Map<String, dynamic>> _rowsFromProjectProducts(List<ProjectProduct> products) {
+    final rows = <Map<String, dynamic>>[];
+    for (final p in products) {
+      final requested = p.requestedQuantity;
+      final distRaw = p.distributedQuantity;
+      final distributed = distRaw.clamp(0, requested).toInt();
+      final int rest = distRaw >= requested ? 0 : requested - distRaw;
+      final supplementaryDisplay = distributed >= requested ? p.supplementaryQuantity : 0;
+      rows.add({
+        'label': _formatProjectProductLine(context, p),
+        'requested': requested,
+        'distributed': distributed,
+        'rest': rest,
+        'supplementary': supplementaryDisplay,
+      });
+    }
+    return rows;
+  }
+
+  Widget _tableHistoryHeaderCell(BuildContext context, String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+      child: Text(
+        text,
+        style: AppTheme.appTextStyle(context, fontWeight: FontWeight.w700, fontSize: 12),
+      ),
+    );
+  }
+
+  Widget _tableHistoryBodyCell(BuildContext context, String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      child: Text(
+        text,
+        style: AppTheme.appTextStyle(context, fontSize: 12),
+      ),
+    );
+  }
+
+  Widget _buildHistoryProductQtyTable(BuildContext context, AppLocalizations l10n, List<Map<String, dynamic>> rows) {
+    if (rows.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 4),
+        child: Text('—', style: AppTheme.appTextStyle(context, color: AppTheme.textSecondary)),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minWidth: constraints.maxWidth),
+              child: Table(
+                border: TableBorder.all(color: AppTheme.textTertiary.withOpacity(0.35)),
+                defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+                children: [
+                  TableRow(
+                    decoration: BoxDecoration(color: AppTheme.primary.withOpacity(0.08)),
+                    children: [
+                      _tableHistoryHeaderCell(context, l10n.product),
+                      _tableHistoryHeaderCell(context, l10n.requestedBoq),
+                      _tableHistoryHeaderCell(context, l10n.distributed),
+                      _tableHistoryHeaderCell(context, l10n.quantityRest),
+                      _tableHistoryHeaderCell(context, l10n.supplementary),
+                    ],
+                  ),
+                  ...rows.map(
+                    (r) => TableRow(
+                      children: [
+                        _tableHistoryBodyCell(context, r['label']?.toString() ?? '—'),
+                        _tableHistoryBodyCell(context, '${r['requested']}'),
+                        _tableHistoryBodyCell(context, '${r['distributed']}'),
+                        _tableHistoryBodyCell(context, '${r['rest']}'),
+                        _tableHistoryBodyCell(context, '${r['supplementary']}'),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -720,11 +868,126 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> with RouteAware
           return key;
       }
     }
+
+    List<Widget> _historyProductBreakdown(ProjectHistory h) {
+      var rows = _historyProductsFromSnapshot(project, h);
+      if (rows.isEmpty) {
+        rows = _rowsFromProjectProducts(project.products ?? const <ProjectProduct>[]);
+      }
+      return [
+        _buildHistoryProductQtyTable(context, l10n, rows),
+      ];
+    }
     final list = <Widget>[
       SizedBox(
         width: double.infinity,
         child: FilledButton.icon(
-          onPressed: () => ProjectReportPdf.export(context, Map<String, dynamic>.from(item)),
+          onPressed: () async {
+            final project = Project.fromJson(Map<String, dynamic>.from(item));
+            final createdStr = project.createdAt == null
+                ? '—'
+                : L10nFormatters.formatDateTime(context, project.createdAt!.toLocal());
+            final history = project.history ?? const <ProjectHistory>[];
+            final updates = <Map<String, dynamic>>[];
+            for (int i = 0; i < history.length; i++) {
+              final h = history[i];
+              if (h.action.toLowerCase() == 'updated' && h.at != null) {
+                updates.add({'index': i, 'at': h.at!});
+              }
+            }
+            updates.sort((a, b) => (a['at'] as DateTime).compareTo(b['at'] as DateTime));
+
+            await showModalBottomSheet<void>(
+              context: context,
+              isScrollControlled: true,
+              builder: (ctx) {
+                final maxH = MediaQuery.sizeOf(ctx).height * 0.9;
+                return SafeArea(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxHeight: maxH),
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Center(
+                            child: Container(
+                              width: 40,
+                              height: 4,
+                              margin: const EdgeInsets.only(bottom: 12),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[300],
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                          ),
+                          ListTile(
+                            leading: const Icon(Icons.picture_as_pdf_outlined),
+                            title: const Text('Print full project PDF'),
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              ProjectReportPdf.export(
+                                context,
+                                Map<String, dynamic>.from(item),
+                                mode: ProjectReportPdf.modeFull,
+                              );
+                            },
+                          ),
+                          ListTile(
+                            leading: const Icon(Icons.date_range_outlined),
+                            title: const Text('Print creation date'),
+                            subtitle: Text(createdStr),
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              ProjectReportPdf.export(
+                                context,
+                                Map<String, dynamic>.from(item),
+                                mode: ProjectReportPdf.modeCreationOnly,
+                              );
+                            },
+                          ),
+                          for (int i = 0; i < updates.length; i++)
+                            ListTile(
+                              leading: const Icon(Icons.update_outlined),
+                              title: Text('Print project update #${i + 1}'),
+                              subtitle: Text(
+                                L10nFormatters.formatDateTime(
+                                  context,
+                                  (updates[i]['at'] as DateTime).toLocal(),
+                                ),
+                              ),
+                              onTap: () {
+                                Navigator.pop(ctx);
+                                ProjectReportPdf.export(
+                                  context,
+                                  Map<String, dynamic>.from(item),
+                                  mode: ProjectReportPdf.modeLastUpdateOnly,
+                                  historyIndex: updates[i]['index'] as int,
+                                );
+                              },
+                            ),
+                          ListTile(
+                            leading: const Icon(Icons.history_outlined),
+                            title: const Text('Print all modifications'),
+                            subtitle: const Text('Project history with all changes'),
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              ProjectReportPdf.export(
+                                context,
+                                Map<String, dynamic>.from(item),
+                                mode: ProjectReportPdf.modeAllModifications,
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            );
+          },
           icon: const Icon(Icons.picture_as_pdf_outlined),
           label: Text(l10n.reportExportProjectPdf),
         ),
@@ -813,10 +1076,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> with RouteAware
                         'Description: ${desc ?? '—'}',
                         style: AppTheme.appTextStyle(context, color: AppTheme.textPrimary),
                       ),
-                      Text(
-                        'Products: ${(project.products ?? const <ProjectProduct>[]).length}',
-                        style: AppTheme.appTextStyle(context, color: AppTheme.textPrimary),
-                      ),
+                      ..._historyProductBreakdown(h),
                     ] else ...[
                       if (project.updatedAt != null)
                         Text(
@@ -835,10 +1095,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> with RouteAware
                         'Description: ${desc ?? '—'}',
                         style: AppTheme.appTextStyle(context, color: AppTheme.textPrimary),
                       ),
-                      Text(
-                        'Products: ${(project.products ?? const <ProjectProduct>[]).length}',
-                        style: AppTheme.appTextStyle(context, color: AppTheme.textPrimary),
-                      ),
+                      ..._historyProductBreakdown(h),
                     ],
                   ],
                 ),

@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import '../../../l10n/app_localizations.dart';
 import '../../../models/product.dart';
+import '../../../models/store.dart';
 import '../../../models/user.dart' show Project;
 import '../../../services/api_service.dart';
 import '../../../theme/app_theme.dart';
 import '../../../utils/l10n_formatters.dart';
 import '../../../utils/product_localized.dart';
+import '../../../utils/store_localized.dart';
 
 DateTime? _parseLocalYmd(String? s) {
   if (s == null || s.trim().isEmpty) return null;
@@ -48,6 +50,11 @@ class _ProjectFormScreenState extends State<ProjectFormScreen> {
   bool _loading = false;
   String? _error;
   List<Product> _allProducts = [];
+  /// Stores + depots (merged) for default stock source on this project.
+  List<Store> _stockSources = [];
+  /// Default store or depot id for warehouse distributions (optional).
+  String? _depotId;
+  final Map<String, num> _stockByProduct = {};
   final List<Map<String, dynamic>> _selectedProducts = [];
 
   /// En édition : dernier projet chargé (liste puis détail GET `/projects/:id`).
@@ -63,6 +70,8 @@ class _ProjectFormScreenState extends State<ProjectFormScreen> {
     _descriptionController.text = p.description ?? '';
     _status = p.status.isNotEmpty ? p.status : 'active';
     _boqCreationDate = _parseLocalYmd(p.boqCreationDate) ?? DateTime.now();
+    final d = p.depotId?.trim();
+    _depotId = (d != null && d.isNotEmpty) ? d : null;
     _selectedProducts.clear();
     // Toutes les lignes (y compris quantité 0) pour ne rien « supprimer » du formulaire.
     for (final pp in p.products ?? []) {
@@ -105,6 +114,35 @@ class _ProjectFormScreenState extends State<ProjectFormScreen> {
       _reloadProjectDetail();
     }
     _loadProducts();
+    _loadStockSources();
+    _loadStockTotals();
+  }
+
+  Future<void> _loadStockSources() async {
+    try {
+      final results = await Future.wait([
+        _apiService.get('/stores'),
+        _apiService.get('/depots'),
+      ]);
+      if (!mounted) return;
+      final merged = <Store>[];
+      final seen = <String>{};
+      void addList(dynamic data) {
+        if (data is! List) return;
+        for (final e in data) {
+          final s = Store.fromJson(Map<String, dynamic>.from(e as Map));
+          if (s.id.isEmpty) continue;
+          if (seen.add(s.id)) merged.add(s);
+        }
+      }
+
+      final storesRes = results[0];
+      final depotsRes = results[1];
+      if (storesRes['success'] == true) addList(storesRes['data']);
+      if (depotsRes['success'] == true) addList(depotsRes['data']);
+      merged.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+      setState(() => _stockSources = merged);
+    } catch (_) {}
   }
 
   @override
@@ -142,6 +180,50 @@ class _ProjectFormScreenState extends State<ProjectFormScreen> {
         });
       }
     } catch (_) {}
+  }
+
+  num _toNum(dynamic value) {
+    if (value == null) return 0;
+    if (value is num) return value;
+    return num.tryParse(value.toString()) ?? 0;
+  }
+
+  String? _extractProductIdFromStockRow(Map<String, dynamic> row) {
+    final direct = row['product_id'] ?? row['productId'];
+    if (direct is String && direct.trim().isNotEmpty) return direct.trim();
+    final product = row['product'];
+    if (product is Map) {
+      final pid = product['id'] ?? product['_id'];
+      if (pid != null) {
+        final s = pid.toString().trim();
+        if (s.isNotEmpty) return s;
+      }
+    }
+    return null;
+  }
+
+  Future<void> _loadStockTotals() async {
+    try {
+      final res = await _apiService.get('/stock');
+      if (!mounted || res['success'] != true || res['data'] == null) return;
+      final totals = <String, num>{};
+      for (final item in (res['data'] as List)) {
+        if (item is! Map) continue;
+        final row = Map<String, dynamic>.from(item);
+        final productId = _extractProductIdFromStockRow(row);
+        if (productId == null) continue;
+        final qty = _toNum(row['quantity']);
+        totals[productId] = (totals[productId] ?? 0) + qty;
+      }
+      if (!mounted) return;
+      setState(() {
+        _stockByProduct
+          ..clear()
+          ..addAll(totals);
+      });
+    } catch (_) {
+      // Keep fallback logic on product stores if stock endpoint fails.
+    }
   }
 
   void _hydrateSelectedManufacturers() {
@@ -349,12 +431,14 @@ class _ProjectFormScreenState extends State<ProjectFormScreen> {
     );
   }
 
-  int _availableStockForProduct(String productId) {
+  num _availableStockForProduct(String productId) {
+    final fromStock = _stockByProduct[productId];
+    if (fromStock != null) return fromStock;
     try {
       final p = _allProducts.firstWhere((x) => x.id == productId);
       final stores = p.stores;
       if (stores == null || stores.isEmpty) return 0;
-      return stores.fold<int>(0, (sum, s) => sum + s.quantity);
+      return stores.fold<num>(0, (sum, s) => sum + s.quantity);
     } catch (_) {
       return 0;
     }
@@ -377,8 +461,8 @@ class _ProjectFormScreenState extends State<ProjectFormScreen> {
         final displayName = localizedApiProductName(context, rawName);
         issues.add(
           isAr
-              ? '- $displayName: مطلوب $requested، المخزون $available، النقص $missing'
-              : '- $displayName: requested $requested, stock $available, missing $missing',
+              ? '- $displayName: مطلوب $requested، المخزون ${available.toStringAsFixed(0)}، النقص ${missing.toStringAsFixed(0)}'
+              : '- $displayName: requested $requested, stock ${available.toStringAsFixed(0)}, missing ${missing.toStringAsFixed(0)}',
         );
       }
     }
@@ -426,6 +510,8 @@ class _ProjectFormScreenState extends State<ProjectFormScreen> {
         'projectOwner': _projectOwnerController.text.trim().isEmpty ? null : _projectOwnerController.text.trim(),
         'projectOwnerAr': _projectOwnerArController.text.trim().isEmpty ? null : _projectOwnerArController.text.trim(),
         if (_isEdit) 'status': _status,
+        if (_isEdit) 'depotId': _depotId,
+        if (!_isEdit && _depotId != null && _depotId!.trim().isNotEmpty) 'depotId': _depotId!.trim(),
       };
       if (_isEdit) {
         final res = await _apiService.put('/projects/${widget.project!.id}', data);
@@ -548,6 +634,41 @@ class _ProjectFormScreenState extends State<ProjectFormScreen> {
                   labelText: l10n.description,
                   border: const OutlineInputBorder(),
                 ),
+              ),
+              const SizedBox(height: AppTheme.spaceMd),
+              Builder(
+                builder: (context) {
+                  final orphanDepot = _depotId != null &&
+                      _depotId!.isNotEmpty &&
+                      !_stockSources.any((d) => d.id == _depotId);
+                  return DropdownButtonFormField<String?>(
+                    value: _depotId,
+                    isExpanded: true,
+                    decoration: InputDecoration(
+                      labelText: l10n.projectDepotOptional,
+                      border: const OutlineInputBorder(),
+                      helperText: l10n.projectDepotHelper,
+                    ),
+                    items: [
+                      DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text(l10n.none, overflow: TextOverflow.ellipsis),
+                      ),
+                      if (orphanDepot)
+                        DropdownMenuItem<String?>(
+                          value: _depotId,
+                          child: Text(_depotId!, overflow: TextOverflow.ellipsis),
+                        ),
+                      ..._stockSources.map(
+                        (d) => DropdownMenuItem<String?>(
+                          value: d.id,
+                          child: Text(d.displayName(context), overflow: TextOverflow.ellipsis, maxLines: 2),
+                        ),
+                      ),
+                    ],
+                    onChanged: (v) => setState(() => _depotId = v),
+                  );
+                },
               ),
               const SizedBox(height: AppTheme.spaceLg),
               Row(

@@ -13,9 +13,12 @@ function projectToApi(data, id) {
   return {
     id,
     name: data.name,
+    nameAr: data.name_ar || null,
     description: data.description,
     status: data.status,
     projectOwner: data.project_owner || null,
+    projectOwnerAr: data.project_owner_ar || null,
+    boqCreationDate: data.boq_creation_date || null,
   };
 }
 
@@ -111,7 +114,9 @@ router.post(
       let project = null;
       if (row.project_id) {
         const projectDoc = await firestore.collection('projects').doc(row.project_id).get();
-        if (projectDoc.exists) project = projectToApi(projectDoc.data(), projectDoc.id);
+        if (projectDoc.exists) {
+          project = projectToApi(projectDoc.data(), projectDoc.id);
+        }
       }
 
       const token = generateToken(userDoc.id);
@@ -129,13 +134,22 @@ router.post(
         },
       });
     } catch (error) {
-      res.status(500).json({ success: false, message: error.message });
+      const msg = error.message || String(error);
+      if (msg.includes('RESOURCE_EXHAUSTED') || msg.includes('Quota exceeded')) {
+        return res.status(503).json({
+          success: false,
+          message:
+            'Database quota exceeded (Firebase). Check Google Cloud billing / Firestore limits or try again later.',
+        });
+      }
+      res.status(500).json({ success: false, message: msg });
     }
   }
 );
 
 router.get('/me', protect, async (req, res) => {
   try {
+    const p = req.user.project;
     res.json({
       success: true,
       data: {
@@ -144,13 +158,17 @@ router.get('/me', protect, async (req, res) => {
         nameAr: req.user.nameAr ?? null,
         email: req.user.email,
         role: req.user.role,
-        project: req.user.project
+        // Same shape as login — always read fresh project in [protect] middleware.
+        project: p
           ? {
-              id: req.user.project.id,
-              name: req.user.project.name,
-              description: req.user.project.description,
-              status: req.user.project.status,
-              projectOwner: req.user.project.projectOwner ?? null,
+              id: p.id,
+              name: p.name,
+              nameAr: p.nameAr ?? null,
+              description: p.description,
+              status: p.status,
+              projectOwner: p.projectOwner ?? null,
+              projectOwnerAr: p.projectOwnerAr ?? null,
+              boqCreationDate: p.boqCreationDate ?? null,
             }
           : null,
         isActive: req.user.isActive,

@@ -29,7 +29,10 @@ class _ReturnFormScreenState extends State<ReturnFormScreen> {
   @override
   void initState() {
     super.initState();
-    _loadProjectProducts();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _loadProjectProducts();
+    });
   }
 
   @override

@@ -44,6 +44,7 @@ exports.protect = async (req, res, next) => {
           status: pData.status,
           projectOwner: pData.project_owner || null,
           projectOwnerAr: pData.project_owner_ar || null,
+          boqCreationDate: pData.boq_creation_date || null,
         };
         const productsMap = pData.products || {};
         projectProducts = Object.entries(productsMap).map(([productId, allowedQuantity]) => ({
@@ -102,11 +103,17 @@ function normalizeRoleForWarehouse(role) {
   return r;
 }
 
+function isWarehouseLikeRole(role) {
+  const r = normalizeRoleForWarehouse(role);
+  if (r === 'warehouse_user' || r === 'warehouse') return true;
+  if (r.startsWith('warehouse_')) return true;
+  return false;
+}
+
 /** Admin or Warehouse User (for stock, distributions, projects view) */
 exports.authorizeAdminOrWarehouse = (req, res, next) => {
   const role = normalizeRoleForWarehouse(req.user?.role);
-  const allowed = ['admin', 'warehouse_user', 'warehouse'];
-  if (allowed.includes(role)) return next();
+  if (role === 'admin' || isWarehouseLikeRole(req.user?.role)) return next();
   return res.status(403).json({
     success: false,
     message: `User role '${req.user?.role}' is not authorized to access this route`,
@@ -118,7 +125,7 @@ exports.checkProjectAccess = async (req, res, next) => {
   const role = normalizeRoleForWarehouse(req.user?.role);
 
   if (role === 'admin') return next();
-  if (role === 'warehouse_user' || role === 'warehouse') return next();
+  if (isWarehouseLikeRole(req.user?.role)) return next();
   if (req.user.project_id && String(req.user.project_id) === projectId) return next();
   if (req.user.project && String(req.user.project.id) === projectId) return next();
 

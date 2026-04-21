@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'services/api_service.dart';
 import 'generated/app_localizations.dart';
 import 'generated/app_localizations_ar.dart';
 import 'generated/app_localizations_en.dart';
@@ -37,8 +38,39 @@ class MyApp extends StatelessWidget {
 
 /// Binds [MaterialApp.locale] to [LocaleProvider] so [LanguageSelector] / `setLocale` work again.
 /// Keeps a simple shell [ThemeData] (no MaterialApp.builder) to reduce gray-screen risk on Android.
-class _LocalizedMaterialApp extends StatelessWidget {
+class _LocalizedMaterialApp extends StatefulWidget {
   const _LocalizedMaterialApp();
+
+  @override
+  State<_LocalizedMaterialApp> createState() => _LocalizedMaterialAppState();
+}
+
+class _LocalizedMaterialAppState extends State<_LocalizedMaterialApp> {
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+
+  @override
+  void initState() {
+    super.initState();
+    ApiService.onUnauthorized = _onSessionExpired;
+  }
+
+  @override
+  void dispose() {
+    ApiService.onUnauthorized = null;
+    super.dispose();
+  }
+
+  Future<void> _onSessionExpired() async {
+    final ctx = _navigatorKey.currentContext;
+    if (ctx == null || !ctx.mounted) return;
+    final auth = Provider.of<AuthProvider>(ctx, listen: false);
+    await auth.logout();
+    if (!ctx.mounted) return;
+    Navigator.of(ctx).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (_) => false,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -47,6 +79,7 @@ class _LocalizedMaterialApp extends StatelessWidget {
     final title = isAr ? AppLocalizationsAr().appTitle : AppLocalizationsEn().appTitle;
 
     return MaterialApp(
+      navigatorKey: _navigatorKey,
       title: title,
       debugShowCheckedModeBanner: false,
       navigatorObservers: [appRouteObserver],

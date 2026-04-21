@@ -218,6 +218,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sourceStoreDepot => 'Source (Store/Depot)';
 
   @override
+  String get distributionSourceReadOnlyHint =>
+      'Taken from the project depot or the approved order — no need to select.';
+
+  @override
+  String get distributionDepotUnresolved =>
+      'No depot found. Set a depot on the project (admin) or open distribution from an approved order.';
+
+  @override
+  String get setProjectDepotShort => 'Set project depot';
+
+  @override
+  String get projectDepotOptional => 'Store / depot (stock source)';
+
+  @override
+  String get projectDepotHelper =>
+      'Optional. Warehouse will use this depot for stock when creating distributions.';
+
+  @override
   String get selectLocationHint =>
       'Select the location with stock to distribute from';
 
@@ -235,6 +253,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get selectProjectFirst => 'Select a project first.';
+
+  @override
+  String get selectSourceFirstShort => 'Select source';
+
+  @override
+  String get noStockAtSelectedSource =>
+      'No available quantity at the selected store or depot. Choose another source or check stock.';
+
+  @override
+  String quantityExceedsMax(String max) {
+    return 'Maximum allowed is $max.';
+  }
 
   @override
   String get noProductsRequested =>
@@ -832,6 +862,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get requested => 'Requested';
 
   @override
+  String get requestedBoq => 'Requested (BOQ)';
+
+  @override
+  String get projectQuantitiesNotStockHint =>
+      'BOQ / project quantities — not warehouse stock.';
+
+  @override
   String get distributed => 'Distributed';
 
   @override
@@ -943,6 +980,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get projectLastEditDateLabel => 'Last project update';
+
+  @override
+  String get reportFirstUpdateDateLabel => 'First update date';
 
   @override
   String get productsQuantitiesHint => 'Products (quantities users can order)';

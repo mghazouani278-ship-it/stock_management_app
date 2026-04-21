@@ -48,7 +48,7 @@ class AuthProvider with ChangeNotifier {
         return false;
       }
     } catch (e) {
-      _error = e.toString().replaceAll('Exception: ', '');
+      _error = ApiService.traduireMessage(e.toString().replaceAll('Exception: ', ''));
       _isLoading = false;
       notifyListeners();
       return false;

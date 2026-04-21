@@ -10,6 +10,9 @@ class ApiService {
   // Local: http://localhost:5000/api (web) | http://127.0.0.1:5000/api (mobile)
   static String get baseUrl =>
       apiBaseUrlOverride ?? 'http://${host.apiHost}:5000/api';
+
+  /// Called when an authenticated request gets HTTP 401 (e.g. expired JWT after backend restart).
+  static Future<void> Function()? onUnauthorized;
   
   // Get auth token (memory cache + SharedPreferences)
   Future<String?> _getToken() async {
@@ -39,7 +42,7 @@ class ApiService {
         headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 15));
 
-      return _handleResponse(response);
+      return await _handleResponse(response);
     } catch (e) {
       throw Exception(traduireMessage(e.toString()));
     }
@@ -54,7 +57,7 @@ class ApiService {
         body: jsonEncode(data),
       ).timeout(const Duration(seconds: 15));
 
-      return _handleResponse(response);
+      return await _handleResponse(response);
     } catch (e) {
       throw Exception(traduireMessage(e.toString()));
     }
@@ -69,7 +72,7 @@ class ApiService {
         body: jsonEncode(data),
       );
 
-      return _handleResponse(response);
+      return await _handleResponse(response);
     } catch (e) {
       throw Exception(traduireMessage(e.toString()));
     }
@@ -92,7 +95,7 @@ class ApiService {
       ));
       final streamed = await request.send();
       final response = await http.Response.fromStream(streamed);
-      return _handleResponse(response);
+      return await _handleResponse(response);
     } catch (e) {
       throw Exception(traduireMessage(e.toString()));
     }
@@ -106,7 +109,7 @@ class ApiService {
         headers: await _getHeaders(),
       );
 
-      return _handleResponse(response);
+      return await _handleResponse(response);
     } catch (e) {
       throw Exception(traduireMessage(e.toString()));
     }
@@ -123,6 +126,16 @@ class ApiService {
     }
     if (m.contains('Invalid credentials')) return 'Invalid credentials.';
     if (m.contains('deactivated')) return 'Your account has been deactivated.';
+    if (ml.contains('session expired') &&
+        (ml.contains('sign in') || ml.contains('sign-in'))) {
+      return _sessionExpiredMessage();
+    }
+    if (ml.contains('resource_exhausted') ||
+        ml.contains('quota exceeded') ||
+        ml.contains('quota_exceeded') ||
+        ml.contains('database quota exceeded')) {
+      return _quotaExceededMessage();
+    }
     if (ml.contains('not authorized') || ml.contains('is not authorized') || ml.contains('forbidden') || ml.contains('unauthorized')) {
       return 'Access denied. Contact your admin.';
     }
@@ -132,17 +145,52 @@ class ApiService {
     if (m.contains('Not found')) return 'Not found.';
     if (m.contains('Route not found')) return 'API route not found. Run start.bat to start the backend.';
     if (m.contains('An error occurred')) return 'An error occurred.';
-    if (m.contains('exceeds allowed quantity')) return 'Quantité supplémentaire : approbation admin requise. Redémarrez le backend (start.ps1) et réessayez.';
+    if (m.contains('exceeds allowed quantity')) return _supplementaryQtyApprovalMessage();
     if (m.contains('HTML instead of JSON') || m.contains('Invalid server response')) {
       return 'Unable to reach the server. Run start.bat to start the backend automatically.';
     }
     return m;
   }
 
+  /// API error copy aligned with [ApiLocale] (login screen, SnackBars) — no BuildContext here.
+  static String _quotaExceededMessage() {
+    switch (ApiLocale.languageCode) {
+      case 'ar':
+        return 'تجاوزت حصة Firebase / Firestore. تحقق من الفوترة في Google Cloud أو حاول لاحقًا.';
+      case 'en':
+      default:
+        return 'Firebase / Firestore quota exceeded. Check Google Cloud billing or try again later.';
+    }
+  }
+
+  static String _supplementaryQtyApprovalMessage() {
+    switch (ApiLocale.languageCode) {
+      case 'ar':
+        return 'كمية إضافية: مطلوب موافقة المسؤول. أعد تشغيل الخادم ثم أعد المحاولة.';
+      case 'en':
+      default:
+        return 'Supplementary quantity: admin approval required. Restart the backend (start.ps1) and try again.';
+    }
+  }
+
+  static String _sessionExpiredMessage() {
+    switch (ApiLocale.languageCode) {
+      case 'ar':
+        return 'انتهت الجلسة. سجّل الدخول مرة أخرى.';
+      case 'en':
+      default:
+        return 'Session expired. Please sign in again.';
+    }
+  }
+
   // Handle HTTP response
-  dynamic _handleResponse(http.Response response) {
+  Future<dynamic> _handleResponse(http.Response response) async {
     final body = response.body;
     if (body.isEmpty) {
+      if (response.statusCode == 401) {
+        await _maybeHandleUnauthorizedSession(body: null);
+        throw Exception(traduireMessage('Session expired. Please sign in again.'));
+      }
       if (response.statusCode >= 200 && response.statusCode < 300) {
         return <String, dynamic>{};
       }
@@ -164,11 +212,30 @@ class ApiService {
       );
     }
 
+    if (response.statusCode == 401) {
+      final msg = responseData is Map ? responseData['message']?.toString() ?? '' : '';
+      final ml = msg.toLowerCase();
+      final isLoginOrPasswordFailure =
+          ml.contains('invalid credentials') || ml.contains('deactivated');
+      if (!isLoginOrPasswordFailure) {
+        await _maybeHandleUnauthorizedSession(body: responseData);
+        throw Exception(traduireMessage('Session expired. Please sign in again.'));
+      }
+      throw Exception(traduireMessage(msg.isNotEmpty ? msg : 'An error occurred'));
+    }
+
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return responseData;
     } else {
       throw Exception(traduireMessage(responseData['message'] ?? 'An error occurred'));
     }
+  }
+
+  static Future<void> _maybeHandleUnauthorizedSession({dynamic body}) async {
+    try {
+      await onUnauthorized?.call();
+    } catch (_) {}
+    await TokenStorage.instance.clearToken();
   }
 }
 

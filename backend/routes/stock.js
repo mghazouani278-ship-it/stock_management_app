@@ -210,12 +210,42 @@ router.get('/distinct-products-count', protect, authorize('admin'), async (req, 
   }
 });
 
+/**
+ * Stock rows for one physical location. Documents may set only `store_id`, only `depot_id`,
+ * or both (see updateStock). Querying one field misses legacy rows; merging avoids empty GET /stock.
+ * Avoids orderBy+where composite index issues that break filtered lists in production.
+ */
+async function stockDocsForLocation(firestore, locationId) {
+  const loc = String(locationId || '').trim();
+  if (!loc) return [];
+  const [snapStore, snapDepot] = await Promise.all([
+    firestore.collection('stock').where('store_id', '==', loc).get(),
+    firestore.collection('stock').where('depot_id', '==', loc).get(),
+  ]);
+  const merged = new Map();
+  for (const d of snapStore.docs) merged.set(d.id, d);
+  for (const d of snapDepot.docs) merged.set(d.id, d);
+  const ms = (d) => {
+    const t = d.data().updated_at;
+    return typeof t?.toMillis === 'function' ? t.toMillis() : 0;
+  };
+  return [...merged.values()].sort((a, b) => ms(b) - ms(a));
+}
+
 router.get('/', protect, authorizeAdminOrWarehouse, async (req, res) => {
   try {
     const firestore = getFirestore();
+    const locationId = req.query.store || req.query.depot;
+    if (locationId) {
+      let docs = await stockDocsForLocation(firestore, locationId);
+      if (req.query.product) {
+        const pid = String(req.query.product).trim();
+        docs = docs.filter((d) => String(d.data().product_id || '') === pid);
+      }
+      const data = await Promise.all(docs.map((d) => stockToApi(d, firestore)));
+      return res.json({ success: true, count: data.length, data });
+    }
     let q = firestore.collection('stock').orderBy('updated_at', 'desc');
-    if (req.query.store) q = q.where('store_id', '==', req.query.store);
-    else if (req.query.depot) q = q.where('depot_id', '==', req.query.depot);
     if (req.query.product) q = q.where('product_id', '==', req.query.product);
     const snapshot = await q.get();
     const data = await Promise.all(snapshot.docs.map(d => stockToApi(d, firestore)));

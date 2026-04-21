@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../navigation/app_route_observer.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../../l10n/app_localizations.dart';
@@ -9,7 +10,6 @@ import '../../widgets/menu_card.dart';
 import '../auth/login_screen.dart';
 import 'warehouse_stock_screen.dart';
 import 'warehouse_projects_screen.dart';
-import 'warehouse_distribution_form_screen.dart';
 import 'warehouse_stock_summary_screen.dart';
 import 'warehouse_approved_orders_screen.dart';
 import 'warehouse_damaged_products_screen.dart';
@@ -24,7 +24,7 @@ class WarehouseHomeScreen extends StatefulWidget {
   State<WarehouseHomeScreen> createState() => _WarehouseHomeScreenState();
 }
 
-class _WarehouseHomeScreenState extends State<WarehouseHomeScreen> {
+class _WarehouseHomeScreenState extends State<WarehouseHomeScreen> with RouteAware, WidgetsBindingObserver {
   final ApiService _apiService = ApiService();
   int _pendingOrdersCount = 0;
   int _approvedOrdersCount = 0;
@@ -36,7 +36,50 @@ class _WarehouseHomeScreenState extends State<WarehouseHomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadBadgeCounts();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route is PageRoute<void>) {
+      appRouteObserver.subscribe(this, route);
+    }
+  }
+
+  @override
+  void dispose() {
+    appRouteObserver.unsubscribe(this);
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshProfileAndBadges();
+    }
+  }
+
+  @override
+  void didPopNext() {
+    _refreshProfileAndBadges();
+  }
+
+  /// Re-sync avec `/auth/me` (projet / nom à jour) + compteurs API.
+  void _refreshProfileAndBadges() {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await context.read<AuthProvider>().loadUser();
+      if (mounted) await _loadBadgeCounts();
+    });
+  }
+
+  Future<void> _onPullToRefresh() async {
+    await context.read<AuthProvider>().loadUser();
+    await _loadBadgeCounts();
   }
 
   Future<void> _loadBadgeCounts() async {
@@ -50,7 +93,15 @@ class _WarehouseHomeScreenState extends State<WarehouseHomeScreen> {
       ]);
       if (mounted) {
         final orderNotifs = results[1] is Map && results[1]['data'] is List
-            ? (results[1]['data'] as List).where((n) => n['type'] == 'order_approved').length
+            ? (results[1]['data'] as List).where((n) {
+                final m = n as Map;
+                if (m['type'] == 'order_approved') return true;
+                if (m['type'] == 'new_order') {
+                  final rd = m['read'];
+                  return rd != true && rd != 'true';
+                }
+                return false;
+              }).length
             : 0;
         setState(() {
           _pendingOrdersCount = _parseCount(results[0]);
@@ -129,9 +180,10 @@ class _WarehouseHomeScreenState extends State<WarehouseHomeScreen> {
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: _loadBadgeCounts,
+        onRefresh: _onPullToRefresh,
         color: AppTheme.primary,
         child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
             SliverToBoxAdapter(
             child: Padding(

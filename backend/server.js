@@ -71,7 +71,14 @@ async function start() {
     } else {
       console.log('Firebase connecté');
     }
-    await ensureAdmin();
+    try {
+      await ensureAdmin();
+    } catch (adminErr) {
+      console.warn(
+        'ensureAdmin a échoué (quota Firestore, réseau, etc.) — le serveur démarre quand même.',
+        adminErr.message || adminErr,
+      );
+    }
     const PORT = process.env.PORT || 5000;
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`Server running on http://localhost:${PORT} (API: http://localhost:${PORT}/api)`);

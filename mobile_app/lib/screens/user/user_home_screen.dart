@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../navigation/app_route_observer.dart';
 import '../../providers/auth_provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../theme/app_theme.dart';
@@ -11,8 +12,54 @@ import 'orders/orders_list_screen.dart';
 import 'returns/returns_list_screen.dart';
 import 'damaged_products/damaged_products_list_screen.dart';
 
-class UserHomeScreen extends StatelessWidget {
+class UserHomeScreen extends StatefulWidget {
   const UserHomeScreen({super.key});
+
+  @override
+  State<UserHomeScreen> createState() => _UserHomeScreenState();
+}
+
+class _UserHomeScreenState extends State<UserHomeScreen> with RouteAware, WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route is PageRoute<void>) {
+      appRouteObserver.subscribe(this, route);
+    }
+  }
+
+  @override
+  void dispose() {
+    appRouteObserver.unsubscribe(this);
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshUser();
+    }
+  }
+
+  @override
+  void didPopNext() {
+    _refreshUser();
+  }
+
+  void _refreshUser() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<AuthProvider>().loadUser();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -72,8 +119,11 @@ class UserHomeScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: CustomScrollView(
-        slivers: [
+      body: RefreshIndicator(
+        onRefresh: () => context.read<AuthProvider>().loadUser(),
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
           if (user?.project != null)
             SliverToBoxAdapter(
               child: Padding(
@@ -207,6 +257,7 @@ class UserHomeScreen extends StatelessWidget {
             ),
           ),
         ],
+        ),
       ),
     );
   }

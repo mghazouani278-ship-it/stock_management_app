@@ -40,12 +40,12 @@ class _LoginScreenState extends State<LoginScreen> {
     );
 
     if (success && mounted) {
-      final role = authProvider.user?.role ?? 'user';
+      final role = (authProvider.user?.role ?? 'user').toLowerCase().replaceAll(' ', '_');
       if (role == 'admin') {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const AdminHomeScreen()),
         );
-      } else if (role == 'warehouse_user') {
+      } else if (role == 'warehouse_user' || role == 'warehouse' || role == 'warehouseuser') {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const WarehouseHomeScreen()),
         );
@@ -56,8 +56,13 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } else if (mounted) {
       final err = authProvider.error ?? 'Login failed';
-      final isConnectionError =
-          err.contains('Impossible de joindre') || err.contains('start.bat');
+      final lower = err.toLowerCase();
+      final isConnectionError = err.contains('Impossible de joindre') ||
+          err.contains('start.bat') ||
+          lower.contains('unable to reach') ||
+          lower.contains('connection refused') ||
+          lower.contains('failed host lookup') ||
+          lower.contains('socketexception');
       setState(() => _connectionError = isConnectionError ? err : null);
       if (!isConnectionError) {
         ScaffoldMessenger.of(context).showSnackBar(

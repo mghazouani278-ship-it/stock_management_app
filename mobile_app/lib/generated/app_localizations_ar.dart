@@ -218,6 +218,24 @@ class AppLocalizationsAr extends AppLocalizations {
   String get sourceStoreDepot => 'المصدر (متجر/مستودع)';
 
   @override
+  String get distributionSourceReadOnlyHint =>
+      'يُؤخذ من مستودع المشروع أو من الطلب المعتمد — لا حاجة للاختيار.';
+
+  @override
+  String get distributionDepotUnresolved =>
+      'لم يُعثر على مستودع. عيّن مستودعاً للمشروع (المسؤول) أو افتح التوزيع من طلب معتمد.';
+
+  @override
+  String get setProjectDepotShort => 'عيّن مستودع المشروع';
+
+  @override
+  String get projectDepotOptional => 'متجر / مستودع (مصدر المخزون)';
+
+  @override
+  String get projectDepotHelper =>
+      'اختياري. يُستخدم هذا المستودع كمصدر للمخزون عند إنشاء التوزيعات من هذا المشروع.';
+
+  @override
   String get selectLocationHint => 'اختر الموقع الذي يحتوي على المخزون للتوزيع';
 
   @override
@@ -234,6 +252,18 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get selectProjectFirst => 'حدد مشروعاً أولاً.';
+
+  @override
+  String get selectSourceFirstShort => 'اختر المصدر';
+
+  @override
+  String get noStockAtSelectedSource =>
+      'لا توجد كمية متاحة في المتجر أو المستودع المحدد. اختر مصدراً آخر أو راجع المخزون.';
+
+  @override
+  String quantityExceedsMax(String max) {
+    return 'الحد الأقصى المسموح هو $max.';
+  }
 
   @override
   String get noProductsRequested =>
@@ -827,6 +857,13 @@ class AppLocalizationsAr extends AppLocalizations {
   String get requested => 'مطلوب';
 
   @override
+  String get requestedBoq => 'مطلوب (جدول الكميات)';
+
+  @override
+  String get projectQuantitiesNotStockHint =>
+      'كميات المشروع / جدول الكميات — وليست مخزون المستودع.';
+
+  @override
   String get distributed => 'موزع';
 
   @override
@@ -937,6 +974,9 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get projectLastEditDateLabel => 'آخر تحديث للمشروع';
+
+  @override
+  String get reportFirstUpdateDateLabel => 'تاريخ أول تحديث';
 
   @override
   String get productsQuantitiesHint =>

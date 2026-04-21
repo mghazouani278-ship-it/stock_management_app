@@ -56,6 +56,20 @@ function projectChangesList(beforeData, afterData) {
   return labels;
 }
 
+function buildHistorySnapshot(data) {
+  return {
+    name: data?.name ?? null,
+    name_ar: data?.name_ar ?? null,
+    description: data?.description ?? null,
+    status: data?.status ?? null,
+    project_owner: data?.project_owner ?? null,
+    project_owner_ar: data?.project_owner_ar ?? null,
+    boq_creation_date: data?.boq_creation_date ?? null,
+    products: normalizeProductsMap(data?.products || {}),
+    products_requested: normalizeProductsMap(data?.products_requested || data?.products || {}),
+  };
+}
+
 function historyActor(req) {
   return {
     id: req.user?.id || null,
@@ -81,6 +95,41 @@ function normalizeBoqCreationDate(v) {
   return s;
 }
 
+/** Same qty parsing as in project payloads / distribution lines. */
+function parseQtyField(v) {
+  if (v == null) return 0;
+  if (typeof v === 'number' && !Number.isNaN(v)) return Math.max(0, Math.floor(v));
+  if (typeof v === 'object' && v != null && ('quantity' in v || 'allowedQuantity' in v || 'allowed_quantity' in v)) {
+    return parseQtyField(v.quantity ?? v.allowedQuantity ?? v.allowed_quantity);
+  }
+  const n = parseInt(String(v), 10);
+  return Number.isNaN(n) ? 0 : Math.max(0, n);
+}
+
+/** Sum quantities from validated distributions for this project (per BOQ line key + product fallback). */
+async function loadDistributedMapsForProject(firestore, projectId) {
+  const distributedByProduct = {};
+  const distributedByKey = {};
+  const distSnap = await firestore.collection('distributions')
+    .where('project_id', '==', projectId)
+    .limit(1000)
+    .get();
+  for (const d of distSnap.docs) {
+    const distData = d.data();
+    for (const p of (distData.products || [])) {
+      const pid = p.product?.id ?? p.product?._id ?? p.product;
+      if (!pid) continue;
+      const pColor = p.color ? String(p.color).trim().toLowerCase() : null;
+      const qty = parseQtyField(p.quantity);
+      if (qty <= 0) continue;
+      distributedByProduct[pid] = (distributedByProduct[pid] ?? 0) + qty;
+      const key = makeProductKey(pid, pColor);
+      if (key !== pid) distributedByKey[key] = (distributedByKey[key] ?? 0) + qty;
+    }
+  }
+  return { distributedByProduct, distributedByKey };
+}
+
 async function projectToApi(doc, firestore) {
   if (!doc || !doc.exists) return null;
   const data = doc.data();
@@ -89,62 +138,67 @@ async function projectToApi(doc, firestore) {
   const productsMap = data.products || {};
   const productsRequestedMap = data.products_requested || {};
   const productDetails = [];
-  const parseQty = (v) => {
-    if (v == null) return 0;
-    if (typeof v === 'number' && !Number.isNaN(v)) return Math.max(0, Math.floor(v));
-    if (typeof v === 'object' && v != null && ('quantity' in v || 'allowedQuantity' in v || 'allowed_quantity' in v)) {
-      return parseQty(v.quantity ?? v.allowedQuantity ?? v.allowed_quantity);
-    }
-    const n = parseInt(String(v), 10);
-    return Number.isNaN(n) ? 0 : Math.max(0, n);
-  };
   const supplementaryByProduct = {};
   const supplementaryByKey = {};
-  // 1. From supplementary_requests (approved)
+  // 1. From supplementary_requests (pending + approved).
+  // UI "Supplementary" shows requested extra volume, not only already-approved rows.
   const suppSnap = await firestore.collection('supplementary_requests')
     .where('project_id', '==', doc.id)
     .limit(200)
     .get();
   for (const d of suppSnap.docs) {
-    if (d.data().status !== 'approved') continue;
+    const reqStatus = String(d.data().status || '').toLowerCase();
+    if (reqStatus === 'rejected' || reqStatus === 'refused' || reqStatus === 'cancelled') continue;
     for (const p of (d.data().products || [])) {
       const pid = p.product?.id ?? p.product?._id ?? p.product;
       if (!pid) continue;
       const pColor = p.color ? String(p.color).trim().toLowerCase() : null;
-      const extra = p.extra_quantity ?? Math.max(0, (p.quantity || 0) - (p.allowed_quantity ?? 0));
-      supplementaryByProduct[pid] = (supplementaryByProduct[pid] ?? 0) + extra;
+      // supplementary_requests store total requested `quantity` + computed `extra_quantity`.
+      // For project supplementary counters we must accumulate only the EXTRA approved quantity.
+      const suppQty = p.extra_quantity ?? Math.max(0, (p.quantity || 0) - (p.allowed_quantity ?? 0));
+      supplementaryByProduct[pid] = (supplementaryByProduct[pid] ?? 0) + suppQty;
       const key = makeProductKey(pid, pColor);
-      if (key !== pid) supplementaryByKey[key] = (supplementaryByKey[key] ?? 0) + extra;
+      if (key !== pid) supplementaryByKey[key] = (supplementaryByKey[key] ?? 0) + suppQty;
     }
   }
-  // 2. From approved orders with supplementary products (user ordered extra, admin approved)
+  // 2. From non-rejected orders with supplementary products.
+  // Include pending so admin can see requested supplementary growth immediately.
   const ordersSnap = await firestore.collection('orders')
     .where('project_id', '==', doc.id)
     .limit(500)
     .get();
   for (const d of ordersSnap.docs) {
     const data = d.data();
-    if (data.status !== 'approved' && data.status !== 'completed') continue;
+    const orderStatus = String(data.status || '').toLowerCase();
+    if (orderStatus === 'rejected' || orderStatus === 'refused' || orderStatus === 'cancelled') continue;
     for (const p of (data.products || [])) {
       if (!p.supplementary) continue;
       const pid = p.product?.id ?? p.product?._id ?? p.product;
       if (!pid) continue;
       const pColor = p.color ? String(p.color).trim().toLowerCase() : null;
-      const qty = p.supplementaryQuantity ?? (p.quantity || 0);
+      // For supplementary order lines, accumulate the supplementary part only.
+      // Prefer explicit `supplementaryQuantity`; fallback to derived quantity - projectQuantity.
+      const explicitSupp = Number(p.supplementaryQuantity);
+      const derivedSupp = Math.max(0, (Number(p.quantity) || 0) - (Number(p.projectQuantity) || 0));
+      const qty = Number.isFinite(explicitSupp) && explicitSupp > 0
+        ? explicitSupp
+        : derivedSupp;
       supplementaryByProduct[pid] = (supplementaryByProduct[pid] ?? 0) + qty;
       const key = makeProductKey(pid, pColor);
       if (key !== pid) supplementaryByKey[key] = (supplementaryByKey[key] ?? 0) + qty;
     }
   }
+  const { distributedByProduct, distributedByKey } = await loadDistributedMapsForProject(firestore, doc.id);
 
   for (const [key, rawAllowed] of Object.entries(productsMap)) {
     const { productId, color } = parseProductKey(key);
     const prodDoc = await firestore.collection('products').doc(productId).get();
-    const allowedQuantity = parseQty(rawAllowed);
+    const allowedQuantity = parseQtyField(rawAllowed);
     const rawRequested = productsRequestedMap[key] ?? rawAllowed;
-    const requestedQuantity = parseQty(rawRequested);
+    const requestedQuantity = parseQtyField(rawRequested);
     const productKey = makeProductKey(productId, color);
     const supplementaryQuantity = (supplementaryByKey[productKey] ?? supplementaryByProduct[productId] ?? 0);
+    const distributedQuantity = (distributedByKey[productKey] ?? distributedByProduct[productId] ?? 0);
     const item = {
       product: prodDoc.exists
         ? { id: productId, name: prodDoc.data().name, category: prodDoc.data().category, unit: prodDoc.data().unit }
@@ -152,6 +206,7 @@ async function projectToApi(doc, firestore) {
       allowedQuantity,
       requestedQuantity: requestedQuantity > 0 ? requestedQuantity : allowedQuantity,
       supplementaryQuantity,
+      distributedQuantity,
     };
     if (color) item.color = color;
     const boq = extractBoqDate(rawAllowed);
@@ -164,6 +219,7 @@ async function projectToApi(doc, firestore) {
         at: firestoreTimestampToIso(h?.at) || firestoreTimestampToIso(h?.createdAt) || null,
         by: h?.by || null,
         changes: Array.isArray(h?.changes) ? h.changes : [],
+        snapshot: h?.snapshot && typeof h.snapshot === 'object' ? h.snapshot : null,
       }))
     : [];
   return {
@@ -175,6 +231,7 @@ async function projectToApi(doc, firestore) {
     status: data.status,
     projectOwner: data.project_owner || null,
     projectOwnerAr: data.project_owner_ar || null,
+    depotId: data.depot_id || null,
     users,
     products: productDetails,
     boqCreationDate: data.boq_creation_date || null,
@@ -188,34 +245,29 @@ function _normalizeRole(role) {
   return (role || '').toLowerCase().replace(/\s+/g, '_');
 }
 
-/** Lightweight: id, name, products only. No users/supplementary/orders. Batches product reads. */
-function projectToApiLite(doc, productCache) {
+/** Lightweight: id, name, products; includes distributedQuantity from distributions (same as full API). */
+async function projectToApiLite(doc, productCache, firestore) {
   if (!doc || !doc.exists) return null;
   const data = doc.data();
   const productsMap = data.products || {};
   const productsRequestedMap = data.products_requested || productsMap;
-  const parseQty = (v) => {
-    if (v == null) return 0;
-    if (typeof v === 'number' && !Number.isNaN(v)) return Math.max(0, Math.floor(v));
-    if (typeof v === 'object' && v != null && ('quantity' in v || 'allowedQuantity' in v || 'allowed_quantity' in v)) {
-      return parseQty(v.quantity ?? v.allowedQuantity ?? v.allowed_quantity);
-    }
-    const n = parseInt(String(v), 10);
-    return Number.isNaN(n) ? 0 : Math.max(0, n);
-  };
+  const { distributedByProduct, distributedByKey } = await loadDistributedMapsForProject(firestore, doc.id);
   const productDetails = [];
   for (const [key, rawAllowed] of Object.entries(productsMap)) {
     const { productId, color } = parseProductKey(key);
     const rawRequested = productsRequestedMap[key] ?? rawAllowed;
-    const requestedQuantity = parseQty(rawRequested);
+    const requestedQuantity = parseQtyField(rawRequested);
     if (requestedQuantity <= 0) continue;
-    const allowedQuantity = parseQty(rawAllowed);
+    const allowedQuantity = parseQtyField(rawAllowed);
     const prod = productCache.get(productId);
+    const productKey = makeProductKey(productId, color);
+    const distributedQuantity = (distributedByKey[productKey] ?? distributedByProduct[productId] ?? 0);
     const lite = {
       product: prod ? { id: productId, name: prod.name } : { id: productId },
       allowedQuantity,
       requestedQuantity,
       supplementaryQuantity: 0,
+      distributedQuantity,
       ...(color ? { color } : {}),
     };
     const boq = extractBoqDate(rawAllowed);
@@ -230,6 +282,7 @@ function projectToApiLite(doc, productCache) {
     status: data.status || 'active',
     projectOwner: data.project_owner || null,
     projectOwnerAr: data.project_owner_ar || null,
+    depotId: data.depot_id || null,
     boqCreationDate: data.boq_creation_date || null,
     createdAt: firestoreTimestampToIso(data.created_at),
     updatedAt: firestoreTimestampToIso(data.updated_at),
@@ -246,13 +299,15 @@ router.get('/', protect, async (req, res) => {
       if (!req.user.project_id) return res.json({ success: true, count: 0, data: [] });
       const doc = await firestore.collection('projects').doc(req.user.project_id).get();
       if (!doc.exists) return res.json({ success: true, count: 0, data: [] });
-      const data = light ? projectToApiLite(doc, await _buildProductCache([doc], firestore)) : await projectToApi(doc, firestore);
+      const data = light
+        ? await projectToApiLite(doc, await _buildProductCache([doc], firestore), firestore)
+        : await projectToApi(doc, firestore);
       return res.json({ success: true, count: 1, data: [data] });
     }
     const snapshot = await firestore.collection('projects').orderBy('created_at', 'desc').get();
     if (light) {
       const productCache = await _buildProductCache(snapshot.docs, firestore);
-      const data = snapshot.docs.map(d => projectToApiLite(d, productCache)).filter(Boolean);
+      const data = (await Promise.all(snapshot.docs.map((d) => projectToApiLite(d, productCache, firestore)))).filter(Boolean);
       return res.json({ success: true, count: data.length, data });
     }
     const data = await Promise.all(snapshot.docs.map(d => projectToApi(d, firestore)));
@@ -303,7 +358,7 @@ router.get('/:id', protect, checkProjectAccess, async (req, res) => {
 
 router.post('/', protect, authorize('admin'), async (req, res) => {
   try {
-    const { name, nameAr, description, images1, products, projectOwner, projectOwnerAr, boqCreationDate, boq_creation_date } = req.body;
+    const { name, nameAr, description, images1, products, projectOwner, projectOwnerAr, boqCreationDate, boq_creation_date, depotId } = req.body;
     if (!name) return res.status(400).json({ success: false, message: 'Please provide a project name' });
     const boqCreationNorm = normalizeBoqCreationDate(boqCreationDate ?? boq_creation_date);
     const firestore = getFirestore();
@@ -324,7 +379,7 @@ router.post('/', protect, authorize('admin'), async (req, res) => {
       }
     }
     const nameArTrim = nameAr != null && String(nameAr).trim() !== '' ? String(nameAr).trim() : null;
-    const ref = await firestore.collection('projects').add({
+    const projectDocData = {
       name: name.trim(),
       name_ar: nameArTrim,
       description: description || null,
@@ -335,12 +390,20 @@ router.post('/', protect, authorize('admin'), async (req, res) => {
       boq_creation_date: boqCreationNorm,
       products: productsMap,
       products_requested: { ...productsMap },
+    };
+    if (depotId != null && String(depotId).trim() !== '') {
+      projectDocData.depot_id = String(depotId).trim();
+    }
+    const ref = await firestore.collection('projects').add({
+      ...projectDocData,
       history: [
         {
           action: 'created',
-          at: admin.firestore.FieldValue.serverTimestamp(),
+          // Firestore forbids FieldValue.serverTimestamp() inside array elements; use Timestamp.
+          at: admin.firestore.Timestamp.now(),
           by: historyActor(req),
           changes: ['project'],
+          snapshot: buildHistorySnapshot(projectDocData),
         },
       ],
       created_at: admin.firestore.FieldValue.serverTimestamp(),
@@ -356,7 +419,7 @@ router.post('/', protect, authorize('admin'), async (req, res) => {
 
 router.put('/:id', protect, authorize('admin'), async (req, res) => {
   try {
-    const { name, nameAr, description, images1, status, products, projectOwner, projectOwnerAr, boqCreationDate, boq_creation_date } = req.body;
+    const { name, nameAr, description, images1, status, products, projectOwner, projectOwnerAr, boqCreationDate, boq_creation_date, depotId } = req.body;
     const firestore = getFirestore();
     const ref = firestore.collection('projects').doc(req.params.id);
     const doc = await ref.get();
@@ -381,6 +444,9 @@ router.put('/:id', protect, authorize('admin'), async (req, res) => {
       const raw = boqCreationDate !== undefined ? boqCreationDate : boq_creation_date;
       updates.boq_creation_date = normalizeBoqCreationDate(raw);
     }
+    if (depotId !== undefined) {
+      updates.depot_id = depotId != null && String(depotId).trim() !== '' ? String(depotId).trim() : null;
+    }
     if (products && Array.isArray(products)) {
       const productsMap = {};
       for (const p of products) {
@@ -398,18 +464,16 @@ router.put('/:id', protect, authorize('admin'), async (req, res) => {
       updates.products_requested = { ...productsMap };
     }
     const beforeComparable = projectComparableData(doc.data() || {});
-    const afterComparable = projectComparableData({ ...(doc.data() || {}), ...updates });
+    const mergedAfter = { ...(doc.data() || {}), ...updates };
+    const afterComparable = projectComparableData(mergedAfter);
     const changes = projectChangesList(beforeComparable, afterComparable);
-    const prevHistory = Array.isArray(doc.data().history) ? doc.data().history : [];
-    updates.history = [
-      ...prevHistory,
-      {
-        action: 'updated',
-        at: admin.firestore.FieldValue.serverTimestamp(),
-        by: historyActor(req),
-        changes: changes.length ? changes : ['project'],
-      },
-    ];
+    updates.history = admin.firestore.FieldValue.arrayUnion({
+      action: 'updated',
+      at: admin.firestore.Timestamp.now(),
+      by: historyActor(req),
+      changes: changes.length ? changes : ['project'],
+      snapshot: buildHistorySnapshot(mergedAfter),
+    });
     await ref.update(updates);
     const updated = await ref.get();
     const data = await projectToApi(updated, firestore);

@@ -11,4 +11,8 @@
 /// Avec SSL plus tard : passer à `https://...` (même règles de chemin `/api`).
 ///
 /// Android cleartext : [network_security_config] + usesCleartextTraffic.
-const String? apiBaseUrlOverride = 'http://92.205.161.189:5000/api';
+///
+/// Quand ce champ est `null`, l’URL est `http://<api_host_io.apiHost>:5000/api` (téléphone
+/// physique → souvent le VPS). **Mettre à jour et redémarrer** ce serveur avec le dossier
+/// `backend/` du dépôt après un correctif API (ex. erreur Firestore sur `history`).
+const String? apiBaseUrlOverride = null;

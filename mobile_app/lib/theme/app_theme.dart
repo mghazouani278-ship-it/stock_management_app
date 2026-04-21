@@ -190,7 +190,7 @@ class AppTheme {
         foregroundColor: textPrimary,
         surfaceTintColor: Colors.transparent,
         titleTextStyle: font(
-          fontSize: 18,
+          fontSize: 18.0,
           fontWeight: FontWeight.w600,
           color: textPrimary,
         ),
@@ -211,7 +211,7 @@ class AppTheme {
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(horizontal: spaceXl, vertical: spaceMd),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radiusMd)),
-          textStyle: font(fontSize: 16, fontWeight: FontWeight.w600),
+          textStyle: font(fontSize: 16.0, fontWeight: FontWeight.w600),
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
@@ -221,7 +221,7 @@ class AppTheme {
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(horizontal: spaceXl, vertical: spaceMd),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radiusMd)),
-          textStyle: font(fontSize: 16, fontWeight: FontWeight.w600),
+          textStyle: font(fontSize: 16.0, fontWeight: FontWeight.w600),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -241,8 +241,8 @@ class AppTheme {
           borderRadius: BorderRadius.circular(radiusMd),
           borderSide: const BorderSide(color: error),
         ),
-        labelStyle: font(color: textSecondary, fontSize: 14),
-        hintStyle: font(color: textTertiary, fontSize: 14),
+        labelStyle: font(color: textSecondary, fontSize: 14.0),
+        hintStyle: font(color: textTertiary, fontSize: 14.0),
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: primary,
@@ -272,19 +272,19 @@ class AppTheme {
 
   static TextTheme _textThemeFor(dynamic font) {
     return TextTheme(
-      displayLarge: font(fontSize: 32, fontWeight: FontWeight.w700, color: textPrimary, letterSpacing: -0.5),
-      displayMedium: font(fontSize: 28, fontWeight: FontWeight.w600, color: textPrimary),
-      displaySmall: font(fontSize: 24, fontWeight: FontWeight.w600, color: textPrimary),
-      headlineLarge: font(fontSize: 22, fontWeight: FontWeight.w600, color: textPrimary),
-      headlineMedium: font(fontSize: 20, fontWeight: FontWeight.w600, color: textPrimary),
-      headlineSmall: font(fontSize: 18, fontWeight: FontWeight.w600, color: textPrimary),
-      titleLarge: font(fontSize: 16, fontWeight: FontWeight.w600, color: textPrimary),
-      titleMedium: font(fontSize: 14, fontWeight: FontWeight.w600, color: textPrimary),
-      titleSmall: font(fontSize: 12, fontWeight: FontWeight.w600, color: textPrimary),
-      bodyLarge: font(fontSize: 16, fontWeight: FontWeight.w400, color: textPrimary),
-      bodyMedium: font(fontSize: 14, fontWeight: FontWeight.w400, color: textPrimary),
-      bodySmall: font(fontSize: 12, fontWeight: FontWeight.w400, color: textSecondary),
-      labelLarge: font(fontSize: 14, fontWeight: FontWeight.w500, color: textPrimary),
+      displayLarge: font(fontSize: 32.0, fontWeight: FontWeight.w700, color: textPrimary, letterSpacing: -0.5),
+      displayMedium: font(fontSize: 28.0, fontWeight: FontWeight.w600, color: textPrimary),
+      displaySmall: font(fontSize: 24.0, fontWeight: FontWeight.w600, color: textPrimary),
+      headlineLarge: font(fontSize: 22.0, fontWeight: FontWeight.w600, color: textPrimary),
+      headlineMedium: font(fontSize: 20.0, fontWeight: FontWeight.w600, color: textPrimary),
+      headlineSmall: font(fontSize: 18.0, fontWeight: FontWeight.w600, color: textPrimary),
+      titleLarge: font(fontSize: 16.0, fontWeight: FontWeight.w600, color: textPrimary),
+      titleMedium: font(fontSize: 14.0, fontWeight: FontWeight.w600, color: textPrimary),
+      titleSmall: font(fontSize: 12.0, fontWeight: FontWeight.w600, color: textPrimary),
+      bodyLarge: font(fontSize: 16.0, fontWeight: FontWeight.w400, color: textPrimary),
+      bodyMedium: font(fontSize: 14.0, fontWeight: FontWeight.w400, color: textPrimary),
+      bodySmall: font(fontSize: 12.0, fontWeight: FontWeight.w400, color: textSecondary),
+      labelLarge: font(fontSize: 14.0, fontWeight: FontWeight.w500, color: textPrimary),
     );
   }
 }

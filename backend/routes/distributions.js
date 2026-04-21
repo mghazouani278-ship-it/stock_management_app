@@ -7,7 +7,6 @@ const { protect, authorize, authorizeAdminOrWarehouse } = require('../middleware
 const { createWarehouseDistributionStatusNotification, createAdminDistributionCompletedNotification } = require('./distributionNotifications');
 const { projectRef, storeRef } = require('../utils/embedRefs');
 const { variantSegmentForStockDocId } = require('../utils/stockColors');
-const { parseProjectProductQty, setProjectMapQty } = require('../utils/projectProductsMap');
 
 function getStockId(productId, storeId, variantLabel) {
   const c = variantLabel && String(variantLabel).trim().toLowerCase();
@@ -97,7 +96,9 @@ router.get('/', protect, authorizeAdminOrWarehouse, async (req, res) => {
   try {
     const firestore = getFirestore();
     let q;
-    if (req.query.status) {
+    if (req.query.order) {
+      q = firestore.collection('distributions').where('order_id', '==', req.query.order);
+    } else if (req.query.status) {
       q = firestore.collection('distributions').where('status', '==', req.query.status);
     } else if (req.query.project) {
       // Use where only to avoid Firestore composite index (orderBy+where on different fields)
@@ -167,6 +168,17 @@ function msgInsufficientStockValidate(displayName, available, quantity, req) {
   return `Stock insuffisant pour "${displayName}". Disponible: ${available}, Demandé: ${quantity}. Ajoutez du stock avant de valider.`;
 }
 
+function msgNoApprovedOrder(req) {
+  const lang = apiLang(req);
+  if (lang === 'en') {
+    return 'No approved order found for this project and store. Admin must approve an order first.';
+  }
+  if (lang === 'ar') {
+    return 'لا يوجد طلب مُعتمد لهذا المشروع وهذا المخزن. يجب أن يعتمد المسؤول الطلب أولاً.';
+  }
+  return "Aucune commande approuvee n'a ete trouvee pour ce projet et ce depot. L'admin doit d'abord approuver une commande.";
+}
+
 function generateSerialNumber() {
   const d = new Date();
   const yyyy = d.getFullYear();
@@ -178,7 +190,25 @@ function generateSerialNumber() {
 
 const colorFromItem = (c) => (c && String(c).trim() ? String(c).trim().toLowerCase() : null);
 
-const makeProductKey = (pid, c) => (c ? `${pid}:${c}` : pid);
+/** Merge duplicate distribution lines (same product + color) */
+function mergeDistributionProducts(items = []) {
+  const merged = new Map();
+  for (const raw of items) {
+    const productId = raw?.product?.id ?? raw?.product?._id ?? raw?.product;
+    const quantity = Number(raw?.quantity || 0);
+    if (!productId || !Number.isFinite(quantity) || quantity <= 0) continue;
+    const color = colorFromItem(raw?.color);
+    const key = `${productId}__${color || ''}`;
+    if (!merged.has(key)) {
+      const out = { product: productId, quantity };
+      if (color) out.color = color;
+      merged.set(key, out);
+    } else {
+      merged.get(key).quantity += quantity;
+    }
+  }
+  return Array.from(merged.values());
+}
 
 /**
  * Stock check before deducting (shared by create + validate).
@@ -204,7 +234,11 @@ async function assertStockAvailableForDistribution(firestore, products, storeId,
   return null;
 }
 
-/** Deduct warehouse stock and decrement project remaining quantities (same as former validate-only step). */
+/**
+ * Deduct warehouse stock only.
+ * Project BOQ remaining (`projects.products`) is already decremented when the user places an order
+ * (`POST /orders`). Applying the same decrement here caused quantities to "double" (rest / distributed wrong).
+ */
 async function applyDistributionDeductions(firestore, products, projectId, storeId, bonAlimentation, userId) {
   for (const item of products) {
     const productId = item.product?.id ?? item.product?._id ?? item.product;
@@ -216,25 +250,6 @@ async function applyDistributionDeductions(firestore, products, projectId, store
       notes: 'Distribution',
       variant: itemColor,
     });
-  }
-  if (projectId) {
-    const projectRef = firestore.collection('projects').doc(projectId);
-    const projectDoc = await projectRef.get();
-    if (projectDoc.exists) {
-      const productsMap = projectDoc.data().products || {};
-      const newProductsMap = { ...productsMap };
-      for (const item of products) {
-        const productId = item.product?.id ?? item.product?._id ?? item.product;
-        const itemColor = colorFromItem(item.color);
-        const key = makeProductKey(productId, itemColor);
-        const current = newProductsMap[key] ?? 0;
-        newProductsMap[key] = setProjectMapQty(current, parseProjectProductQty(current) - item.quantity);
-      }
-      await projectRef.update({
-        products: newProductsMap,
-        updated_at: admin.firestore.FieldValue.serverTimestamp(),
-      });
-    }
   }
 }
 
@@ -267,18 +282,43 @@ async function sendValidatedDistributionNotifications(firestore, ref, data, req,
 
 router.post('/', protect, authorizeAdminOrWarehouse, async (req, res) => {
   try {
-    const { bonAlimentation, project, store, depot, products, notes, distributionDate } = req.body;
+    const { bonAlimentation, project, store, depot, products, notes, distributionDate, orderId } = req.body;
     const storeId = store || depot;
     if (!project || !storeId || !products || !Array.isArray(products) || products.length === 0) {
       return res.status(400).json({ success: false, message: 'Please provide project, store, and products' });
     }
     const firestore = getFirestore();
-    const firestoreProducts = products.map((p) => {
+    const approvedOrdersSnap = await firestore.collection('orders')
+      .where('project_id', '==', project)
+      .where('approved_store_id', '==', storeId)
+      .where('status', 'in', ['approved', 'completed'])
+      .limit(1)
+      .get();
+    if (approvedOrdersSnap.empty) {
+      return res.status(400).json({
+        success: false,
+        message: msgNoApprovedOrder(req),
+      });
+    }
+    if (orderId && String(orderId).trim()) {
+      const existingByOrder = await firestore.collection('distributions')
+        .where('order_id', '==', String(orderId).trim())
+        .limit(1)
+        .get();
+      if (!existingByOrder.empty) {
+        return res.status(400).json({
+          success: false,
+          message: 'This approved order already has a distribution',
+        });
+      }
+    }
+
+    const firestoreProducts = mergeDistributionProducts(products.map((p) => {
       const pid = p.product?.id ?? p.product?._id ?? p.product;
       const out = { product: pid, quantity: p.quantity };
       if (p.color && String(p.color).trim()) out.color = String(p.color).trim().toLowerCase();
       return out;
-    });
+    }));
     const stockErr = await assertStockAvailableForDistribution(firestore, firestoreProducts, storeId, req, 'create');
     if (stockErr) return res.status(stockErr.status).json(stockErr.body);
     const serialNumber = generateSerialNumber();
@@ -291,6 +331,7 @@ router.post('/', protect, authorizeAdminOrWarehouse, async (req, res) => {
       bon_alimentation: bonValue,
       project_id: project,
       store_id: storeId,
+      order_id: orderId && String(orderId).trim() ? String(orderId).trim() : null,
       status: 'pending',
       created_by: req.user.id,
       distribution_date: distDate,
@@ -315,6 +356,20 @@ router.post('/', protect, authorizeAdminOrWarehouse, async (req, res) => {
       validated_at: admin.firestore.FieldValue.serverTimestamp(),
       updated_at: admin.firestore.FieldValue.serverTimestamp(),
     });
+    if (orderId && String(orderId).trim()) {
+      const orderRef = firestore.collection('orders').doc(String(orderId).trim());
+      const orderDoc = await orderRef.get();
+      if (orderDoc.exists) {
+        const st = orderDoc.data().status;
+        if (st === 'approved' || st === 'completed') {
+          await orderRef.update({
+            status: 'completed',
+            delivery_date: admin.firestore.FieldValue.serverTimestamp(),
+            updated_at: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        }
+      }
+    }
     const doc = await ref.get();
     const data = await distributionToApi(doc, firestore);
     await sendValidatedDistributionNotifications(firestore, ref, doc.data(), req, project, storeId);
@@ -332,7 +387,7 @@ router.put('/:id/validate', protect, authorizeAdminOrWarehouse, async (req, res)
     if (!doc.exists) return res.status(404).json({ success: false, message: 'Distribution not found' });
     const data = doc.data();
     if (data.status === 'validated') return res.status(400).json({ success: false, message: 'Distribution already validated' });
-    const products = data.products || [];
+    const products = mergeDistributionProducts(data.products || []);
     const projectId = data.project_id;
     const sid = data.store_id || data.depot_id;
 

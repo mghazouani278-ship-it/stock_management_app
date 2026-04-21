@@ -144,7 +144,7 @@ class _WarehouseReturnsScreenState extends State<WarehouseReturnsScreen> {
               const SizedBox(height: 8),
               Chip(
                 label: Text(localizedUiStatus(ctx, returnItem.status), style: const TextStyle(fontSize: 12)),
-                backgroundColor: (returnItem.status == 'approved' ? Colors.green : returnItem.status == 'rejected' ? Colors.red : Colors.orange).withOpacity(0.2),
+                backgroundColor: (returnItem.status == 'approved' ? Colors.green : Colors.red).withOpacity(0.2),
               ),
               if (returnItem.project != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(AppLocalizations.of(ctx)!.projectLabel(returnItem.project!.displayName(ctx)))),
               if (returnItem.user != null)
@@ -217,7 +217,7 @@ class _WarehouseReturnsScreenState extends State<WarehouseReturnsScreen> {
             margin: const EdgeInsets.only(bottom: 8),
             child: ListTile(
               leading: CircleAvatar(
-                backgroundColor: r.status == 'approved' ? Colors.green : r.status == 'rejected' ? Colors.red : Colors.orange,
+                backgroundColor: r.status == 'approved' ? Colors.green : Colors.red,
                 child: Icon(r.status == 'approved' ? Icons.check : r.status == 'rejected' ? Icons.close : Icons.pending, color: Colors.white, size: 20),
               ),
               title: Text(r.project?.displayName(context) ?? AppLocalizations.of(context)!.returnItem, style: const TextStyle(fontWeight: FontWeight.bold)),
