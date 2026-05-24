@@ -909,6 +909,30 @@ abstract class AppLocalizations {
   /// **'Select store to deduct stock from:'**
   String get selectStoreToDeduct;
 
+  /// No description provided for @approveOrderPerProductStores.
+  ///
+  /// In en, this message translates to:
+  /// **'Each product is deducted from its store in Stock Management:'**
+  String get approveOrderPerProductStores;
+
+  /// No description provided for @stockDeductedPerProductStore.
+  ///
+  /// In en, this message translates to:
+  /// **'Stock will be deducted from each store shown above when the warehouse creates the distribution.'**
+  String get stockDeductedPerProductStore;
+
+  /// No description provided for @productNoStockSelectStore.
+  ///
+  /// In en, this message translates to:
+  /// **'Not found in stock — choose a store manually.'**
+  String get productNoStockSelectStore;
+
+  /// No description provided for @stockStoreLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Stock store: {store}'**
+  String stockStoreLabel(String store);
+
   /// No description provided for @stockDeductedFromStore.
   ///
   /// In en, this message translates to:
@@ -1017,11 +1041,30 @@ abstract class AppLocalizations {
   /// **'(project)'**
   String get orderQtyLabelProject;
 
+  /// No description provided for @orderQtyLabelRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'(remaining)'**
+  String get orderQtyLabelRemaining;
+
   /// No description provided for @orderQtyLabelSupplementary.
   ///
   /// In en, this message translates to:
   /// **'(supplementary)'**
   String get orderQtyLabelSupplementary;
+
+  /// No description provided for @orderQtyAllSupplementary.
+  ///
+  /// In en, this message translates to:
+  /// **'{quantity} {unit} (supplementary)'**
+  String orderQtyAllSupplementary(int quantity, String unit);
+
+  /// No description provided for @orderQtySupplementaryBreakdown.
+  ///
+  /// In en, this message translates to:
+  /// **'{remaining} remaining + {supplementary} supplementary → total {total} {unit}'**
+  String orderQtySupplementaryBreakdown(
+      int remaining, int supplementary, int total, String unit);
 
   /// No description provided for @orderDate.
   ///

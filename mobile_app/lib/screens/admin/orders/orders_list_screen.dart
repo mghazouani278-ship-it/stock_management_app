@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../models/order.dart';
+import '../../../models/stock.dart';
 import '../../../models/user.dart';
 import '../../../models/store.dart';
 import '../../../services/api_service.dart';
@@ -11,6 +12,8 @@ import '../../../utils/embedded_ref_localized.dart';
 import '../../../utils/store_localized.dart';
 import '../../../utils/product_localized.dart';
 import '../../../utils/l10n_ui_helpers.dart';
+import '../../../utils/order_quantity_display.dart';
+import '../../../utils/order_stock_store.dart';
 import '../../../utils/project_localized.dart';
 import '../../user/orders/order_form_screen.dart';
 class AdminOrdersListScreen extends StatefulWidget {
@@ -87,6 +90,7 @@ class _AdminOrdersListScreenState extends State<AdminOrdersListScreen> {
   }
 
   Future<void> _approveOrder(Order order) async {
+    final l10n = AppLocalizations.of(context)!;
     if (_stores.isEmpty) {
       try {
         final res = await _apiService.get('/stores');
@@ -99,43 +103,133 @@ class _AdminOrdersListScreenState extends State<AdminOrdersListScreen> {
       }
     }
     if (_stores.isEmpty) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context)!.noStoresAvailable)));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l10n.noStoresAvailable)));
       return;
     }
-    String? storeId = _stores.first.id;
+
+    List<Stock> stocks = [];
+    try {
+      final stockRes = await _apiService.get('/stock');
+      if (stockRes['success'] == true && stockRes['data'] != null) {
+        stocks = (stockRes['data'] as List)
+            .map((e) => Stock.fromJson(Map<String, dynamic>.from(e as Map)))
+            .toList();
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()), backgroundColor: Colors.red));
+      return;
+    }
+
+    final lines = <Map<String, dynamic>>[];
+    for (final p in order.products) {
+      final color = p.color;
+      final stock = findStockForOrderLine(stocks, p.product, color);
+      final storeId = stock?.documentStoreId ?? stock?.store?.id;
+      lines.add({
+        'productId': p.product,
+        'name': localizedOrderProductDisplayName(context, p.name, p.product),
+        'color': color,
+        'qtyText': formatOrderProductQuantityText(l10n, p),
+        'storeId': storeId ?? _stores.first.id,
+        'storeName': stock?.store?.name,
+        'hasStock': storeId != null,
+      });
+    }
+
     final approved = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setD) => AlertDialog(
-          title: Text(AppLocalizations.of(context)!.approveOrder),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(AppLocalizations.of(context)!.selectStoreToDeduct),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                value: storeId,
-                decoration: InputDecoration(labelText: AppLocalizations.of(context)!.storeRequired, border: const OutlineInputBorder()),
-                items: _stores.map((s) => DropdownMenuItem(value: s.id, child: Text(s.displayName(context)))).toList(),
-                onChanged: (v) => setD(() => storeId = v),
+          title: Text(l10n.approveOrder),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(l10n.approveOrderPerProductStores, style: TextStyle(fontSize: 13, color: Colors.grey[700])),
+                  const SizedBox(height: 16),
+                  ...lines.map((line) {
+                    final storeId = line['storeId'] as String;
+                    final hasStock = line['hasStock'] as bool;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${line['name']}: ${line['qtyText']}',
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(height: 6),
+                          DropdownButtonFormField<String>(
+                            value: storeId,
+                            decoration: InputDecoration(
+                              labelText: l10n.storeRequired,
+                              border: const OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                            items: _stores
+                                .map((s) => DropdownMenuItem(
+                                      value: s.id,
+                                      child: Text(s.displayName(context)),
+                                    ))
+                                .toList(),
+                            onChanged: (v) => setD(() {
+                              if (v != null) line['storeId'] = v;
+                            }),
+                          ),
+                          if (!hasStock)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(
+                                l10n.productNoStockSelectStore,
+                                style: const TextStyle(fontSize: 11, color: Colors.orange),
+                              ),
+                            )
+                          else if (line['storeName'] != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(
+                                l10n.stockStoreLabel('${line['storeName']}'),
+                                style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                              ),
+                            ),
+                        ],
+                      ),
+                    );
+                  }),
+                  const SizedBox(height: 8),
+                  Text(l10n.stockDeductedPerProductStore, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                ],
               ),
-              const SizedBox(height: 12),
-              Text(AppLocalizations.of(context)!.stockDeductedFromStore, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-            ],
+            ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(AppLocalizations.of(context)!.cancel)),
-            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(AppLocalizations.of(context)!.approve)),
+            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(l10n.cancel)),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(l10n.approve)),
           ],
         ),
       ),
     );
     if (approved != true || !mounted) return;
     try {
-      await _apiService.put('/orders/${order.id}/status', {'status': 'approved', 'store': storeId});
+      final productStores = lines.map((line) {
+        final map = <String, dynamic>{
+          'product': line['productId'],
+          'store': line['storeId'],
+        };
+        final c = line['color'] as String?;
+        if (c != null && c.isNotEmpty) map['color'] = c;
+        return map;
+      }).toList();
+      await _apiService.put('/orders/${order.id}/status', {
+        'status': 'approved',
+        'productStores': productStores,
+      });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context)!.orderApproved), backgroundColor: Colors.green));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l10n.orderApproved), backgroundColor: Colors.green));
         _loadOrders();
       }
     } catch (e) {
@@ -306,32 +400,11 @@ class _AdminOrdersListScreenState extends State<AdminOrdersListScreen> {
               const SizedBox(height: 16),
               Text(l10n.productsLabel, style: const TextStyle(fontWeight: FontWeight.bold)),
               ...order.products.map((p) {
-                    final unit = formatRawUnitForDisplay(p.unit);
-                    final qtyText = p.supplementary
-                        ? '${p.projectQuantity} ${l10n.orderQtyLabelProject} + ${p.supplementaryQuantity} ${l10n.orderQtyLabelSupplementary} = ${p.quantity} $unit'
-                        : '${p.quantity} $unit';
+                    final qtyText = formatOrderProductQuantityText(l10n, p);
                     return Padding(
                       padding: const EdgeInsets.only(top: 4),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              '  • ${localizedOrderProductDisplayName(ctx, p.name, p.product)}: $qtyText',
-                            ),
-                          ),
-                          if (p.supplementary)
-                            Padding(
-                              padding: const EdgeInsetsDirectional.only(start: 8),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: Colors.orange.withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(l10n.supplementary, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.orange)),
-                              ),
-                            ),
-                        ],
+                      child: Text(
+                        '  • ${localizedOrderProductDisplayName(ctx, p.name, p.product)}: $qtyText',
                       ),
                     );
                   }),

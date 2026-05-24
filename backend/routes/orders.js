@@ -6,9 +6,27 @@ const { protect, authorize } = require('../middleware/auth');
 const { createOrderNotification } = require('./orderNotifications');
 const { projectRef, userRef } = require('../utils/embedRefs');
 const { parseProjectProductQty, setProjectMapQty, addProjectMapQty } = require('../utils/projectProductsMap');
+const {
+  makeProductKey,
+  parseQtyField,
+  loadDistributedMapsForProject,
+  splitOrderQuantity,
+} = require('../utils/projectBoqRemaining');
+const { findStockStoreForProductLine, buildStoreByProductKey } = require('../utils/resolveProductStockStore');
 
-function makeProductKey(productId, color) {
-  return color ? `${productId}:${color}` : productId;
+function orderLineContext(projectData, distributedMaps, productId, color) {
+  const productsMap = projectData?.products || {};
+  const productsRequestedMap = projectData?.products_requested || productsMap;
+  const key = makeProductKey(productId, color);
+  const rawRequested = productsRequestedMap[key] ?? productsMap[key];
+  const requestedQty = parseQtyField(rawRequested);
+  const distributedQty =
+    (distributedMaps.distributedByKey[key] ?? distributedMaps.distributedByProduct[productId] ?? 0);
+  return {
+    requestedQty,
+    distributedQty,
+    allowedInMap: productsMap[key],
+  };
 }
 
 /** Merge duplicate product lines (same id + color) so one request cannot deduct twice. */
@@ -39,21 +57,51 @@ async function orderToApi(doc, firestore) {
   const data = doc.data();
   const userDoc = await firestore.collection('users').doc(data.user_id).get();
   const projectDoc = await firestore.collection('projects').doc(data.project_id).get();
+  const projectData = projectDoc.exists ? projectDoc.data() : null;
+  const distributedMaps = projectData
+    ? await loadDistributedMapsForProject(firestore, data.project_id)
+    : { distributedByProduct: {}, distributedByKey: {} };
+
   const products = (data.products || []).map(async (p) => {
     const prodId = p.product?.id ?? p.product?._id ?? p.product;
     const prodDoc = prodId ? await firestore.collection('products').doc(prodId).get() : null;
+    const color = (p.variant ?? p.color) ? String(p.variant ?? p.color).trim().toLowerCase() : null;
     const item = {
       product: prodDoc?.exists ? { id: prodDoc.id, name: prodDoc.data().name, category: prodDoc.data().category, unit: prodDoc.data().unit } : { id: prodId },
       quantity: p.quantity,
     };
-    if (p.variant ?? p.color) {
-      const v = p.variant ?? p.color;
-      item.variant = v;
-      item.color = v;
+    if (color) {
+      item.variant = color;
+      item.color = color;
     }
-    if (p.supplementary) item.supplementary = true;
-    item.projectQuantity = p.projectQuantity != null ? p.projectQuantity : (p.supplementary ? 0 : p.quantity);
-    item.supplementaryQuantity = p.supplementaryQuantity != null ? p.supplementaryQuantity : (p.supplementary ? p.quantity : 0);
+    const qty = Number(p.quantity) || 0;
+    let projectQty;
+    let supplementaryQty;
+    let isSupplementary;
+    if (projectData && prodId) {
+      const ctx = orderLineContext(projectData, distributedMaps, prodId, color);
+      const split = splitOrderQuantity(qty, ctx);
+      projectQty = split.projectQuantity;
+      supplementaryQty = split.supplementaryQuantity;
+      isSupplementary = split.supplementary;
+    } else {
+      const projStored = p.projectQuantity != null ? Number(p.projectQuantity) : (p.project_quantity != null ? Number(p.project_quantity) : null);
+      const suppStored = p.supplementaryQuantity != null ? Number(p.supplementaryQuantity) : (p.supplementary_quantity != null ? Number(p.supplementary_quantity) : null);
+      if (projStored != null || suppStored != null) {
+        projectQty = Math.max(0, projStored ?? 0);
+        supplementaryQty = Math.max(0, suppStored ?? 0);
+      } else if (p.supplementary) {
+        projectQty = 0;
+        supplementaryQty = qty;
+      } else {
+        projectQty = qty;
+        supplementaryQty = 0;
+      }
+      isSupplementary = p.supplementary || supplementaryQty > 0;
+    }
+    if (isSupplementary) item.supplementary = true;
+    item.projectQuantity = projectQty;
+    item.supplementaryQuantity = supplementaryQty;
     return item;
   });
   const orderDate = data.order_date;
@@ -68,6 +116,12 @@ async function orderToApi(doc, firestore) {
     user: userRef(userDoc),
     project: projectRef(projectDoc),
     approvedStoreId: data.approved_store_id || null,
+    approvedProductStores: (data.approved_product_stores || []).map((row) => ({
+      product: row.product_id ?? row.product,
+      store: row.store_id ?? row.store,
+      storeName: row.store_name ?? null,
+      color: row.color ?? row.variant ?? null,
+    })),
     products: await Promise.all(products),
     status: data.status,
     notes: data.notes,
@@ -134,6 +188,7 @@ router.post('/', protect, async (req, res) => {
     const firestore = getFirestore();
     const projectRef = firestore.collection('projects').doc(projectId);
     const orderRef = firestore.collection('orders').doc();
+    const distributedMaps = await loadDistributedMapsForProject(firestore, projectId);
 
     let projectNameForNotif = null;
 
@@ -144,8 +199,9 @@ router.post('/', protect, async (req, res) => {
         e.code = 'NOT_FOUND';
         throw e;
       }
-      projectNameForNotif = projectDoc.data().name || null;
-      const productsMap = { ...(projectDoc.data().products || {}) };
+      const projectData = projectDoc.data();
+      projectNameForNotif = projectData.name || null;
+      const productsMap = { ...(projectData.products || {}) };
       const validatedProducts = [];
       const productsToDeduct = [];
       for (const line of lines) {
@@ -157,14 +213,19 @@ router.post('/', protect, async (req, res) => {
           e.code = 'BAD_PRODUCT';
           throw e;
         }
-        const allowed = parseProjectProductQty(allowedRaw);
-        const projectQty = Math.min(quantity, allowed);
-        const supplementaryQty = Math.max(0, quantity - allowed);
-        if (quantity > allowed) {
-          validatedProducts.push({ product: productId, quantity, supplementary: true, color, projectQuantity: projectQty, supplementaryQuantity: supplementaryQty });
-        } else {
-          validatedProducts.push({ product: productId, quantity, supplementary: false, color, projectQuantity: projectQty, supplementaryQuantity: supplementaryQty });
-          productsToDeduct.push({ product: productId, quantity, color });
+        const ctx = orderLineContext(projectData, distributedMaps, productId, color);
+        const split = splitOrderQuantity(quantity, ctx);
+        const { projectQuantity: projectQty, supplementaryQuantity: supplementaryQty, supplementary: isSupplementary } = split;
+        validatedProducts.push({
+          product: productId,
+          quantity,
+          supplementary: isSupplementary,
+          color,
+          projectQuantity: projectQty,
+          supplementaryQuantity: supplementaryQty,
+        });
+        if (projectQty > 0) {
+          productsToDeduct.push({ product: productId, quantity: projectQty, color });
         }
       }
 
@@ -228,7 +289,7 @@ router.post('/', protect, async (req, res) => {
 router.put('/:id/status', protect, async (req, res) => {
   try {
     if (req.user.role !== 'admin') return res.status(403).json({ success: false, message: 'Only admins can update order status' });
-    const { status, store: storeId, depot: depotId } = req.body;
+    const { status, store: storeId, depot: depotId, productStores: productStoresBody } = req.body;
     const sid = storeId || depotId;
     if (!['pending', 'approved', 'rejected', 'completed'].includes(status)) return res.status(400).json({ success: false, message: 'Invalid status' });
     const firestore = getFirestore();
@@ -267,8 +328,60 @@ router.put('/:id/status', protect, async (req, res) => {
       });
     }
 
+    let approvedProductStores = [];
     if ((status === 'approved' || status === 'completed') && currentStatus === 'pending') {
-      if (!sid) return res.status(400).json({ success: false, message: 'Please provide store ID when approving order' });
+      if (Array.isArray(productStoresBody) && productStoresBody.length > 0) {
+        approvedProductStores = productStoresBody.map((row) => {
+          const pid = row.product?.id ?? row.product?._id ?? row.product;
+          const store = row.store ?? row.store_id ?? row.depot;
+          if (!pid || !store) {
+            const e = new Error('Each product must include product id and store id');
+            e.code = 'BAD_PRODUCT_STORES';
+            throw e;
+          }
+          return {
+            product_id: pid,
+            store_id: store,
+            color: row.color ?? row.variant ?? null,
+            store_name: row.storeName ?? row.store_name ?? null,
+          };
+        });
+      } else if (sid) {
+        for (const item of orderData.products || []) {
+          const pid = item.product?.id ?? item.product?._id ?? item.product;
+          if (!pid) continue;
+          approvedProductStores.push({
+            product_id: pid,
+            store_id: sid,
+            color: item.variant ?? item.color ?? null,
+          });
+        }
+      } else {
+        for (const item of orderData.products || []) {
+          const pid = item.product?.id ?? item.product?._id ?? item.product;
+          if (!pid) continue;
+          const color = item.variant ?? item.color ?? null;
+          const found = await findStockStoreForProductLine(firestore, pid, color);
+          if (!found?.storeId) {
+            const prodDoc = await firestore.collection('products').doc(pid).get();
+            const name = prodDoc?.exists ? prodDoc.data().name : pid;
+            return res.status(400).json({
+              success: false,
+              message: `No stock registered for "${name}"${color ? ` (${color})` : ''}. Add stock with a store first.`,
+            });
+          }
+          approvedProductStores.push({
+            product_id: pid,
+            store_id: found.storeId,
+            color: color || null,
+            store_name: found.storeName || null,
+          });
+        }
+      }
+      if (approvedProductStores.length === 0) {
+        return res.status(400).json({ success: false, message: 'Please provide store per product or a default store when approving' });
+      }
+      const primaryStoreId = approvedProductStores[0].store_id;
       // Stock is deducted when warehouse saves the distribution (not here).
       const projectRef = firestore.collection('projects').doc(orderData.project_id);
       const projectDoc = await projectRef.get();
@@ -300,7 +413,8 @@ router.put('/:id/status', protect, async (req, res) => {
           status: 'approved',
           products: productsForNotification,
           projectName,
-          storeId: sid,
+          storeId: primaryStoreId,
+          productStores: approvedProductStores,
         });
       }
     }
@@ -308,7 +422,8 @@ router.put('/:id/status', protect, async (req, res) => {
     const updates = { status, updated_at: admin.firestore.FieldValue.serverTimestamp() };
     if (status === 'approved' || status === 'completed') {
       updates.approved_at = admin.firestore.FieldValue.serverTimestamp();
-      updates.approved_store_id = sid;
+      updates.approved_store_id = approvedProductStores[0]?.store_id ?? sid;
+      updates.approved_product_stores = approvedProductStores;
       updates.stock_deducted = false;
     }
     if (status === 'completed') {

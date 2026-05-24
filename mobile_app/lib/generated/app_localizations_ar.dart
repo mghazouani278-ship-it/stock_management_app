@@ -443,6 +443,23 @@ class AppLocalizationsAr extends AppLocalizations {
   String get selectStoreToDeduct => 'اختر المتجر لخصم المخزون منه:';
 
   @override
+  String get approveOrderPerProductStores =>
+      'كل منتج يُخصم من متجره المسجل في إدارة المخزون:';
+
+  @override
+  String get stockDeductedPerProductStore =>
+      'يُخصم المخزون من كل متجر عند إنشاء التوزيع من المستودع.';
+
+  @override
+  String get productNoStockSelectStore =>
+      'غير موجود في المخزون — اختر متجرًا يدويًا.';
+
+  @override
+  String stockStoreLabel(String store) {
+    return 'متجر المخزون: $store';
+  }
+
+  @override
   String get stockDeductedFromStore => 'سيتم خصم المخزون من هذا المتجر.';
 
   @override
@@ -497,7 +514,21 @@ class AppLocalizationsAr extends AppLocalizations {
   String get orderQtyLabelProject => '(من المشروع)';
 
   @override
+  String get orderQtyLabelRemaining => '(متبقي)';
+
+  @override
   String get orderQtyLabelSupplementary => '(إضافي)';
+
+  @override
+  String orderQtyAllSupplementary(int quantity, String unit) {
+    return '$quantity $unit (إضافي)';
+  }
+
+  @override
+  String orderQtySupplementaryBreakdown(
+      int remaining, int supplementary, int total, String unit) {
+    return '$remaining متبقي + $supplementary إضافي → المجموع $total $unit';
+  }
 
   @override
   String get orderDate => 'تاريخ الطلب:';

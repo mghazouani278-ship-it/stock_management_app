@@ -5,6 +5,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../utils/product_localized.dart';
 import '../../../utils/project_localized.dart';
 import '../../../utils/l10n_formatters.dart';
+import '../../../utils/order_stock_store.dart';
 import '../../../models/stock.dart';
 import '../../../models/store.dart';
 import '../../../models/user.dart';
@@ -35,6 +36,9 @@ class _WarehouseDistributionFormScreenState extends State<WarehouseDistributionF
   List<Stock> _locationStock = [];
   /// Order-level approved quantities (per product+variant) when opened from an order.
   final Map<String, int> _orderApprovedQtyByKey = {};
+  /// Stores from approved order (one per product line); empty = use [_resolvedStoreId] only.
+  Set<String> _orderStoreIds = {};
+  Map<String, String> _orderStoreByProductKey = {};
   bool _loading = true;
   bool _saving = false;
   String? _error;
@@ -58,6 +62,22 @@ class _WarehouseDistributionFormScreenState extends State<WarehouseDistributionF
       if (!mounted || res['success'] != true || res['data'] == null) return;
       final data = Map<String, dynamic>.from(res['data'] as Map);
       final sid = data['approvedStoreId']?.toString() ?? data['approved_store_id']?.toString();
+      final approvedStores = data['approvedProductStores'] ?? data['approved_product_stores'];
+      final Set<String> storeIds = {};
+      final storeByKey = <String, String>{};
+      if (approvedStores is List) {
+        for (final raw in approvedStores) {
+          if (raw is! Map) continue;
+          final s = raw['store']?.toString() ?? raw['store_id']?.toString();
+          final pid = raw['product']?.toString() ?? raw['product_id']?.toString();
+          final color = raw['color']?.toString() ?? raw['variant']?.toString();
+          if (s != null && s.isNotEmpty) storeIds.add(s);
+          if (pid != null && pid.isNotEmpty && s != null && s.isNotEmpty) {
+            storeByKey[orderLineKey(pid, color)] = s;
+          }
+        }
+      }
+      if (storeIds.isEmpty && sid != null && sid.isNotEmpty) storeIds.add(sid);
       final proj = data['project'];
       String? projectId = _selectedProjectId;
       if (proj is Map) {
@@ -85,6 +105,8 @@ class _WarehouseDistributionFormScreenState extends State<WarehouseDistributionF
         _orderApprovedQtyByKey
           ..clear()
           ..addAll(orderApproved);
+        _orderStoreIds = storeIds;
+        _orderStoreByProductKey = storeByKey;
       });
       await _refreshLocationStock();
     } catch (_) {}
@@ -230,10 +252,13 @@ class _WarehouseDistributionFormScreenState extends State<WarehouseDistributionF
   num _warehouseQtyForLine(String productId, String? color) {
     final want = _normalizeVariant(color);
     final targetPid = _canonicalProductId(productId);
+    final assignedStore = _orderStoreByProductKey[_lineKey(productId, color)];
     num sum = 0;
     for (final s in _locationStock) {
       final pid = _canonicalProductId(s.documentProductId ?? s.product?.id);
       if (pid != targetPid) continue;
+      final sid = s.documentStoreId ?? s.store?.id ?? '';
+      if (assignedStore != null && assignedStore.isNotEmpty && sid != assignedStore) continue;
       final sv = _normalizeVariant(s.variant);
       if (want.isEmpty) {
         if (sv.isEmpty) sum += s.quantity;
@@ -282,15 +307,36 @@ class _WarehouseDistributionFormScreenState extends State<WarehouseDistributionF
   }
 
   Future<void> _refreshLocationStock() async {
-    if (_resolvedStoreId == null) {
+    if (_resolvedStoreId == null && _orderStoreIds.isEmpty) {
       if (mounted) setState(() => _locationStock = []);
       return;
     }
-    final isDepot = _depots.any((d) => d.id == _resolvedStoreId);
     try {
+      if (_orderStoreIds.length > 1) {
+        final res = await _apiService.get('/stock');
+        if (!mounted) return;
+        if (res['success'] == true && res['data'] != null) {
+          final list = res['data'] as List;
+          setState(() {
+            _locationStock = list
+                .map((e) => Stock.fromJson(Map<String, dynamic>.from(e as Map)))
+                .where((s) => _orderStoreIds.contains(s.documentStoreId ?? s.store?.id ?? ''))
+                .toList();
+          });
+        } else {
+          setState(() => _locationStock = []);
+        }
+        return;
+      }
+      final loc = _resolvedStoreId;
+      if (loc == null) {
+        if (mounted) setState(() => _locationStock = []);
+        return;
+      }
+      final isDepot = _depots.any((d) => d.id == loc);
       final res = await _apiService.get(
         '/stock',
-        queryParams: isDepot ? {'depot': _resolvedStoreId!} : {'store': _resolvedStoreId!},
+        queryParams: isDepot ? {'depot': loc} : {'store': loc},
       );
       if (!mounted) return;
       if (res['success'] == true && res['data'] != null) {

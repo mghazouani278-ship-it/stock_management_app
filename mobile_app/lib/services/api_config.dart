@@ -8,11 +8,8 @@
 /// `http://127.0.0.1:5000/api` (voir [api_host_io.dart]) ou `http://localhost:5000/api` (web).
 /// Lancer `node server.js` dans `backend/` avant de tester.
 ///
-/// Avec SSL plus tard : passer à `https://...` (même règles de chemin `/api`).
+/// HTTPS `https://api.egypt-grid.com/api` : activer APRÈS enregistrement DNS A `api` → 92.205.161.189 + SSL.
+/// Tant que `api.egypt-grid.com` n’existe pas (NXDOMAIN), garder l’IP ci-dessous.
 ///
-/// Android cleartext : [network_security_config] + usesCleartextTraffic.
-///
-/// Quand ce champ est `null`, l’URL est `http://<api_host_io.apiHost>:5000/api` (téléphone
-/// physique → souvent le VPS). **Mettre à jour et redémarrer** ce serveur avec le dossier
-/// `backend/` du dépôt après un correctif API (ex. erreur Firestore sur `history`).
+/// Quand ce champ est `null`, l’URL est `http://<api_host_io.apiHost>:5000/api` (dev local).
 const String? apiBaseUrlOverride = null;

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../utils/l10n_formatters.dart';
+import '../../../utils/order_quantity_display.dart';
 import '../../../utils/product_localized.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../services/api_service.dart';
@@ -452,9 +453,12 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
                             ],
                           ),
                           Text(
-                            isSupplementary
-                                ? l10n.allocatedSummaryWithExtra('$allowed', unit, '${qty - allowed}')
-                                : l10n.allocatedWithUnit('$allowed', unit),
+                            formatOrderFormQuantityPreview(
+                              l10n,
+                              allocatedRemaining: allowed,
+                              orderQty: qty,
+                              unit: unit,
+                            ),
                             style: AppTheme.appTextStyle(context, fontSize: 12, fontWeight: FontWeight.w500, color: allowed > 0 ? AppTheme.primary : AppTheme.warning),
                           ),
                         ],

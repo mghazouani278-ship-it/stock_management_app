@@ -7,6 +7,7 @@ const { protect, authorize, authorizeAdminOrWarehouse } = require('../middleware
 const { createWarehouseDistributionStatusNotification, createAdminDistributionCompletedNotification } = require('./distributionNotifications');
 const { projectRef, storeRef } = require('../utils/embedRefs');
 const { variantSegmentForStockDocId } = require('../utils/stockColors');
+const { buildStoreByProductKey, makeProductKey } = require('../utils/resolveProductStockStore');
 
 function getStockId(productId, storeId, variantLabel) {
   const c = variantLabel && String(variantLabel).trim().toLowerCase();
@@ -214,12 +215,13 @@ function mergeDistributionProducts(items = []) {
  * Stock check before deducting (shared by create + validate).
  * @param {'create'|'validate'} messageKind
  */
-async function assertStockAvailableForDistribution(firestore, products, storeId, req, messageKind) {
+async function assertStockAvailableForDistribution(firestore, products, storeId, req, messageKind, storeByKey) {
   for (const item of products) {
     const productId = item.product?.id ?? item.product?._id ?? item.product;
     const itemColor = colorFromItem(item.color);
     const quantity = item.quantity || 0;
-    const available = await getAvailableStock(firestore, productId, storeId, itemColor);
+    const lineStoreId = storeByKey?.get(makeProductKey(productId, itemColor)) ?? storeId;
+    const available = await getAvailableStock(firestore, productId, lineStoreId, itemColor);
     if (available < quantity) {
       const productDoc = await firestore.collection('products').doc(productId).get();
       const productName = productDoc?.exists ? productDoc.data().name : productId;
@@ -239,11 +241,12 @@ async function assertStockAvailableForDistribution(firestore, products, storeId,
  * Project BOQ remaining (`projects.products`) is already decremented when the user places an order
  * (`POST /orders`). Applying the same decrement here caused quantities to "double" (rest / distributed wrong).
  */
-async function applyDistributionDeductions(firestore, products, projectId, storeId, bonAlimentation, userId) {
+async function applyDistributionDeductions(firestore, products, projectId, storeId, bonAlimentation, userId, storeByKey) {
   for (const item of products) {
     const productId = item.product?.id ?? item.product?._id ?? item.product;
     const itemColor = colorFromItem(item.color);
-    await updateStock(productId, storeId, -item.quantity, 'distribution', {
+    const lineStoreId = storeByKey?.get(makeProductKey(productId, itemColor)) ?? storeId;
+    await updateStock(productId, lineStoreId, -item.quantity, 'distribution', {
       project: projectId,
       user: userId,
       reference: bonAlimentation,
@@ -288,17 +291,32 @@ router.post('/', protect, authorizeAdminOrWarehouse, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Please provide project, store, and products' });
     }
     const firestore = getFirestore();
-    const approvedOrdersSnap = await firestore.collection('orders')
-      .where('project_id', '==', project)
-      .where('approved_store_id', '==', storeId)
-      .where('status', 'in', ['approved', 'completed'])
-      .limit(1)
-      .get();
-    if (approvedOrdersSnap.empty) {
-      return res.status(400).json({
-        success: false,
-        message: msgNoApprovedOrder(req),
-      });
+    let orderDocForStores = null;
+    if (orderId && String(orderId).trim()) {
+      orderDocForStores = await firestore.collection('orders').doc(String(orderId).trim()).get();
+      if (!orderDocForStores.exists) {
+        return res.status(400).json({ success: false, message: 'Order not found' });
+      }
+      const ost = orderDocForStores.data().status;
+      if (ost !== 'approved' && ost !== 'completed') {
+        return res.status(400).json({ success: false, message: 'Order is not approved yet' });
+      }
+      if (String(orderDocForStores.data().project_id || '') !== String(project)) {
+        return res.status(400).json({ success: false, message: 'Order does not belong to this project' });
+      }
+    } else {
+      const approvedOrdersSnap = await firestore.collection('orders')
+        .where('project_id', '==', project)
+        .where('approved_store_id', '==', storeId)
+        .where('status', 'in', ['approved', 'completed'])
+        .limit(1)
+        .get();
+      if (approvedOrdersSnap.empty) {
+        return res.status(400).json({
+          success: false,
+          message: msgNoApprovedOrder(req),
+        });
+      }
     }
     if (orderId && String(orderId).trim()) {
       const existingByOrder = await firestore.collection('distributions')
@@ -319,7 +337,10 @@ router.post('/', protect, authorizeAdminOrWarehouse, async (req, res) => {
       if (p.color && String(p.color).trim()) out.color = String(p.color).trim().toLowerCase();
       return out;
     }));
-    const stockErr = await assertStockAvailableForDistribution(firestore, firestoreProducts, storeId, req, 'create');
+    const storeByKey = orderDocForStores?.exists
+      ? buildStoreByProductKey(orderDocForStores.data(), storeId)
+      : null;
+    const stockErr = await assertStockAvailableForDistribution(firestore, firestoreProducts, storeId, req, 'create', storeByKey);
     if (stockErr) return res.status(stockErr.status).json(stockErr.body);
     const serialNumber = generateSerialNumber();
     const bonValue = bonAlimentation && String(bonAlimentation).trim() ? bonAlimentation.trim() : serialNumber;
@@ -341,7 +362,7 @@ router.post('/', protect, authorizeAdminOrWarehouse, async (req, res) => {
       updated_at: admin.firestore.FieldValue.serverTimestamp(),
     });
     try {
-      await applyDistributionDeductions(firestore, firestoreProducts, project, storeId, bonValue, req.user.id);
+      await applyDistributionDeductions(firestore, firestoreProducts, project, storeId, bonValue, req.user.id, storeByKey);
     } catch (deductErr) {
       try {
         await ref.delete();
@@ -391,10 +412,15 @@ router.put('/:id/validate', protect, authorizeAdminOrWarehouse, async (req, res)
     const projectId = data.project_id;
     const sid = data.store_id || data.depot_id;
 
-    const stockErr = await assertStockAvailableForDistribution(firestore, products, sid, req, 'validate');
+    let storeByKey = null;
+    if (data.order_id) {
+      const orderDoc = await firestore.collection('orders').doc(data.order_id).get();
+      if (orderDoc.exists) storeByKey = buildStoreByProductKey(orderDoc.data(), sid);
+    }
+    const stockErr = await assertStockAvailableForDistribution(firestore, products, sid, req, 'validate', storeByKey);
     if (stockErr) return res.status(stockErr.status).json(stockErr.body);
 
-    await applyDistributionDeductions(firestore, products, projectId, sid, data.bon_alimentation, req.user.id);
+    await applyDistributionDeductions(firestore, products, projectId, sid, data.bon_alimentation, req.user.id, storeByKey);
 
     await ref.update({
       status: 'validated',

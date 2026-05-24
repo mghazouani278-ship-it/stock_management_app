@@ -6,6 +6,7 @@ import '../../../utils/embedded_ref_localized.dart';
 import '../../../utils/product_localized.dart';
 import '../../../theme/app_theme.dart';
 import '../../../utils/order_display.dart';
+import '../../../utils/order_quantity_display.dart';
 import '../../../widgets/connection_error_widget.dart';
 import 'order_form_screen.dart';
 
@@ -122,32 +123,11 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
               const SizedBox(height: 16),
               Text(l10n.productsLabel, style: const TextStyle(fontWeight: FontWeight.bold)),
               ...order.products.map((p) {
-                    final unit = formatRawUnitForDisplay(p.unit);
-                    final qtyText = p.supplementary
-                        ? '${p.projectQuantity} ${l10n.orderQtyLabelProject} + ${p.supplementaryQuantity} ${l10n.orderQtyLabelSupplementary} = ${p.quantity} $unit'
-                        : '${p.quantity} $unit';
+                    final qtyText = formatOrderProductQuantityText(l10n, p);
                     return Padding(
                       padding: const EdgeInsets.only(top: 4),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              '  • ${localizedOrderProductDisplayName(ctx, p.name, p.product)}: $qtyText',
-                            ),
-                          ),
-                          if (p.supplementary)
-                            Padding(
-                              padding: const EdgeInsetsDirectional.only(start: 8),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: Colors.orange.withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(l10n.supplementary, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.orange)),
-                              ),
-                            ),
-                        ],
+                      child: Text(
+                        '  • ${localizedOrderProductDisplayName(ctx, p.name, p.product)}: $qtyText',
                       ),
                     );
                   }),

@@ -444,6 +444,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get selectStoreToDeduct => 'Select store to deduct stock from:';
 
   @override
+  String get approveOrderPerProductStores =>
+      'Each product is deducted from its store in Stock Management:';
+
+  @override
+  String get stockDeductedPerProductStore =>
+      'Stock will be deducted from each store shown above when the warehouse creates the distribution.';
+
+  @override
+  String get productNoStockSelectStore =>
+      'Not found in stock — choose a store manually.';
+
+  @override
+  String stockStoreLabel(String store) {
+    return 'Stock store: $store';
+  }
+
+  @override
   String get stockDeductedFromStore =>
       'Stock will be deducted from this store.';
 
@@ -500,7 +517,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get orderQtyLabelProject => '(project)';
 
   @override
+  String get orderQtyLabelRemaining => '(remaining)';
+
+  @override
   String get orderQtyLabelSupplementary => '(supplementary)';
+
+  @override
+  String orderQtyAllSupplementary(int quantity, String unit) {
+    return '$quantity $unit (supplementary)';
+  }
+
+  @override
+  String orderQtySupplementaryBreakdown(
+      int remaining, int supplementary, int total, String unit) {
+    return '$remaining remaining + $supplementary supplementary → total $total $unit';
+  }
 
   @override
   String get orderDate => 'Order date:';

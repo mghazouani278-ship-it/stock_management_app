@@ -197,6 +197,15 @@
   "refuseSupplementaryRequest": "Refuse supplementary request",
   "refuseSupplementaryRequestQuestion": "Refuse this supplementary request?",
   "selectStoreToDeduct": "Select store to deduct stock from:",
+  "approveOrderPerProductStores": "Each product is deducted from its store in Stock Management:",
+  "stockDeductedPerProductStore": "Stock will be deducted from each store shown above when the warehouse creates the distribution.",
+  "productNoStockSelectStore": "Not found in stock — choose a store manually.",
+  "stockStoreLabel": "Stock store: {store}",
+  "@stockStoreLabel": {
+    "placeholders": {
+      "store": {"type": "String"}
+    }
+  },
   "stockDeductedFromStore": "Stock will be deducted from this store.",
   "orderApproved": "Order approved. Stock deducted.",
   "orderDeleted": "Order deleted.",
@@ -215,7 +224,24 @@
   "orderStatusCompleted": "Completed",
   "orderStatusRejected": "Rejected",
   "orderQtyLabelProject": "(project)",
+  "orderQtyLabelRemaining": "(remaining)",
   "orderQtyLabelSupplementary": "(supplementary)",
+  "orderQtyAllSupplementary": "{quantity} {unit} (supplementary)",
+  "@orderQtyAllSupplementary": {
+    "placeholders": {
+      "quantity": {"type": "int"},
+      "unit": {"type": "String"}
+    }
+  },
+  "orderQtySupplementaryBreakdown": "{remaining} remaining + {supplementary} supplementary → total {total} {unit}",
+  "@orderQtySupplementaryBreakdown": {
+    "placeholders": {
+      "remaining": {"type": "int"},
+      "supplementary": {"type": "int"},
+      "total": {"type": "int"},
+      "unit": {"type": "String"}
+    }
+  },
   "orderDate": "Order date:",
   "orderDateValue": "Order date: {date}",
   "@orderDateValue": {

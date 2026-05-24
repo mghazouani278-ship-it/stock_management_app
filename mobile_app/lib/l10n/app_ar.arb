@@ -162,6 +162,15 @@
   "refuseSupplementaryRequest": "رفض الطلب الإضافي",
   "refuseSupplementaryRequestQuestion": "رفض هذا الطلب الإضافي؟",
   "selectStoreToDeduct": "اختر المتجر لخصم المخزون منه:",
+  "approveOrderPerProductStores": "كل منتج يُخصم من متجره المسجل في إدارة المخزون:",
+  "stockDeductedPerProductStore": "يُخصم المخزون من كل متجر عند إنشاء التوزيع من المستودع.",
+  "productNoStockSelectStore": "غير موجود في المخزون — اختر متجرًا يدويًا.",
+  "stockStoreLabel": "متجر المخزون: {store}",
+  "@stockStoreLabel": {
+    "placeholders": {
+      "store": {"type": "String"}
+    }
+  },
   "stockDeductedFromStore": "سيتم خصم المخزون من هذا المتجر.",
   "orderApproved": "تمت الموافقة على الطلب. تم خصم المخزون.",
   "orderDeleted": "تم حذف الطلب.",
@@ -180,7 +189,24 @@
   "orderStatusCompleted": "مكتمل",
   "orderStatusRejected": "مرفوض",
   "orderQtyLabelProject": "(من المشروع)",
+  "orderQtyLabelRemaining": "(متبقي)",
   "orderQtyLabelSupplementary": "(إضافي)",
+  "orderQtyAllSupplementary": "{quantity} {unit} (إضافي)",
+  "@orderQtyAllSupplementary": {
+    "placeholders": {
+      "quantity": {"type": "int"},
+      "unit": {"type": "String"}
+    }
+  },
+  "orderQtySupplementaryBreakdown": "{remaining} متبقي + {supplementary} إضافي → المجموع {total} {unit}",
+  "@orderQtySupplementaryBreakdown": {
+    "placeholders": {
+      "remaining": {"type": "int"},
+      "supplementary": {"type": "int"},
+      "total": {"type": "int"},
+      "unit": {"type": "String"}
+    }
+  },
   "orderDate": "تاريخ الطلب:",
   "orderDateValue": "تاريخ الطلب: {date}",
   "projectLabel": "المشروع: {name}",
