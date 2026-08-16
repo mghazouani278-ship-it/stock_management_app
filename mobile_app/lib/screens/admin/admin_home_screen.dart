@@ -87,6 +87,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final role = Provider.of<AuthProvider>(context).user?.role;
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
@@ -144,7 +145,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    l10n.adminDashboard,
+                    isManager(role) ? l10n.managerDashboard : l10n.adminDashboard,
                     style: AppTheme.appTextStyle(context, 
                       fontSize: 24,
                       fontWeight: FontWeight.w700,

@@ -42,6 +42,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get adminDashboard => 'لوحة تحكم المسؤول';
 
   @override
+  String get managerDashboard => 'لوحة تحكم المدير';
+
+  @override
   String get dashboard => 'لوحة التحكم';
 
   @override

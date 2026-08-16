@@ -164,6 +164,12 @@ abstract class AppLocalizations {
   /// **'Admin Dashboard'**
   String get adminDashboard;
 
+  /// No description provided for @managerDashboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Manager Dashboard'**
+  String get managerDashboard;
+
   /// No description provided for @dashboard.
   ///
   /// In en, this message translates to:

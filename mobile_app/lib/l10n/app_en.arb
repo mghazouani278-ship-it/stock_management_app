@@ -13,6 +13,7 @@
   "warehouse": "Warehouse",
   "warehouseDashboard": "Warehouse Dashboard",
   "adminDashboard": "Admin Dashboard",
+  "managerDashboard": "Manager Dashboard",
   "dashboard": "Dashboard",
 
   "stock": "Stock",

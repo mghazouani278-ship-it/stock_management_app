@@ -42,6 +42,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get adminDashboard => 'Admin Dashboard';
 
   @override
+  String get managerDashboard => 'Manager Dashboard';
+
+  @override
   String get dashboard => 'Dashboard';
 
   @override
