@@ -558,32 +558,33 @@ class _StockListScreenState extends State<StockListScreen> {
               if (stock.product != null && stock.product!.categories.isNotEmpty)
                 _detailRow(l10n.category, stock.product!.displayCategories(context)),
               const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        Navigator.pop(ctx);
-                        _updateQuantity(stock);
-                      },
-                      icon: const Icon(Icons.edit, size: 18),
-                      label: Text(l10n.edit),
+              if (!widget.readOnly)
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _updateQuantity(stock);
+                        },
+                        icon: const Icon(Icons.edit, size: 18),
+                        label: Text(l10n.edit),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: () {
-                        Navigator.pop(ctx);
-                        _deleteStock(stock);
-                      },
-                      style: FilledButton.styleFrom(backgroundColor: Colors.red),
-                      icon: const Icon(Icons.delete, size: 18),
-                      label: Text(l10n.delete),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _deleteStock(stock);
+                        },
+                        style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                        icon: const Icon(Icons.delete, size: 18),
+                        label: Text(l10n.delete),
+                      ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
             ],
           ),
         ),
@@ -987,11 +988,12 @@ class _StockListScreenState extends State<StockListScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(AppLocalizations.of(context)!.noStockYet, textAlign: TextAlign.center),
-              const SizedBox(height: 8),
-              Text(AppLocalizations.of(context)!.tapToAddStock, textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey)),
-              const SizedBox(height: 24),
-              if (!widget.readOnly)
+              if (!widget.readOnly) ...[
+                const SizedBox(height: 8),
+                Text(AppLocalizations.of(context)!.tapToAddStock, textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey)),
+                const SizedBox(height: 24),
                 FilledButton.icon(onPressed: _showAddStock, icon: const Icon(Icons.add), label: Text(AppLocalizations.of(context)!.addStock)),
+              ],
             ],
           ),
         ),
@@ -1143,8 +1145,10 @@ class _StockListScreenState extends State<StockListScreen> {
                             final l10n = AppLocalizations.of(context)!;
                             return [
                               PopupMenuItem(value: 'display', child: Row(children: [const Icon(Icons.visibility, size: 20), const SizedBox(width: 8), Text(l10n.display)])),
-                              PopupMenuItem(value: 'edit', child: Row(children: [const Icon(Icons.edit, size: 20), const SizedBox(width: 8), Text(l10n.edit)])),
-                              PopupMenuItem(value: 'delete', child: Row(children: [const Icon(Icons.delete, size: 20, color: Colors.red), const SizedBox(width: 8), Text(l10n.delete, style: const TextStyle(color: Colors.red))])),
+                              if (!widget.readOnly) ...[
+                                PopupMenuItem(value: 'edit', child: Row(children: [const Icon(Icons.edit, size: 20), const SizedBox(width: 8), Text(l10n.edit)])),
+                                PopupMenuItem(value: 'delete', child: Row(children: [const Icon(Icons.delete, size: 20, color: Colors.red), const SizedBox(width: 8), Text(l10n.delete, style: const TextStyle(color: Colors.red))])),
+                              ],
                             ];
                           },
                         ),
