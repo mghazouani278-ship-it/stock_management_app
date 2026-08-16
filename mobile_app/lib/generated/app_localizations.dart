@@ -252,14 +252,98 @@ abstract class AppLocalizations {
   /// No description provided for @reportValidatedDistributions.
   ///
   /// In en, this message translates to:
-  /// **'Validated Distributions'**
+  /// **'Taking Delivery'**
   String get reportValidatedDistributions;
 
   /// No description provided for @reportValidatedDistributionsMenu.
   ///
   /// In en, this message translates to:
-  /// **'Validated\nDistributions'**
+  /// **'Taking\nDelivery'**
   String get reportValidatedDistributionsMenu;
+
+  /// No description provided for @reportTakingDelivery.
+  ///
+  /// In en, this message translates to:
+  /// **'Taking Delivery'**
+  String get reportTakingDelivery;
+
+  /// No description provided for @takingDeliveryProjectCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Project creation date'**
+  String get takingDeliveryProjectCreated;
+
+  /// No description provided for @takingDeliveryProjectOwner.
+  ///
+  /// In en, this message translates to:
+  /// **'Project owner'**
+  String get takingDeliveryProjectOwner;
+
+  /// No description provided for @takingDeliveryQtyDistributed.
+  ///
+  /// In en, this message translates to:
+  /// **'Qty distributed'**
+  String get takingDeliveryQtyDistributed;
+
+  /// No description provided for @takingDeliveryQtyRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'Qty remaining'**
+  String get takingDeliveryQtyRemaining;
+
+  /// No description provided for @takingDeliveryReplacements.
+  ///
+  /// In en, this message translates to:
+  /// **'Product replacements'**
+  String get takingDeliveryReplacements;
+
+  /// No description provided for @takingDeliveryTimeline.
+  ///
+  /// In en, this message translates to:
+  /// **'Order timeline'**
+  String get takingDeliveryTimeline;
+
+  /// No description provided for @takingDeliveryUserOrderDate.
+  ///
+  /// In en, this message translates to:
+  /// **'User order date'**
+  String get takingDeliveryUserOrderDate;
+
+  /// No description provided for @takingDeliverySupervisorToAdmin.
+  ///
+  /// In en, this message translates to:
+  /// **'Supervisor sent to admin'**
+  String get takingDeliverySupervisorToAdmin;
+
+  /// No description provided for @takingDeliveryAdminToManager.
+  ///
+  /// In en, this message translates to:
+  /// **'Admin sent to manager'**
+  String get takingDeliveryAdminToManager;
+
+  /// No description provided for @takingDeliveryManagerApproved.
+  ///
+  /// In en, this message translates to:
+  /// **'Manager approved'**
+  String get takingDeliveryManagerApproved;
+
+  /// No description provided for @takingDeliveryWarehouseDistributed.
+  ///
+  /// In en, this message translates to:
+  /// **'Warehouse distribution date'**
+  String get takingDeliveryWarehouseDistributed;
+
+  /// No description provided for @takingDeliveryArrivedAtUser.
+  ///
+  /// In en, this message translates to:
+  /// **'Arrival at user'**
+  String get takingDeliveryArrivedAtUser;
+
+  /// No description provided for @takingDeliveryArrivalAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Arrival at {name}'**
+  String takingDeliveryArrivalAt(String name);
 
   /// No description provided for @reportApprovedReturns.
   ///
@@ -296,6 +380,336 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Projects'**
   String get reportProjectsMenu;
+
+  /// No description provided for @procurementPlanning.
+  ///
+  /// In en, this message translates to:
+  /// **'Procurement Planning'**
+  String get procurementPlanning;
+
+  /// No description provided for @procurementPlanningMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Procurement\nPlanning'**
+  String get procurementPlanningMenu;
+
+  /// No description provided for @procurementColRequiredPerProject.
+  ///
+  /// In en, this message translates to:
+  /// **'Required Qty / Project'**
+  String get procurementColRequiredPerProject;
+
+  /// No description provided for @procurementColTotalRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Required Qty'**
+  String get procurementColTotalRequired;
+
+  /// No description provided for @procurementColRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'Remaining to Supply'**
+  String get procurementColRemaining;
+
+  /// No description provided for @procurementColWarehouseStock.
+  ///
+  /// In en, this message translates to:
+  /// **'Warehouse Stock'**
+  String get procurementColWarehouseStock;
+
+  /// No description provided for @procurementColQtyToPurchase.
+  ///
+  /// In en, this message translates to:
+  /// **'Quantity to Purchase'**
+  String get procurementColQtyToPurchase;
+
+  /// No description provided for @procurementColTotalRequiredShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Required'**
+  String get procurementColTotalRequiredShort;
+
+  /// No description provided for @procurementColRemainingShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Remaining'**
+  String get procurementColRemainingShort;
+
+  /// No description provided for @procurementColWhStockShort.
+  ///
+  /// In en, this message translates to:
+  /// **'WH Stock'**
+  String get procurementColWhStockShort;
+
+  /// No description provided for @procurementColToPurchaseShort.
+  ///
+  /// In en, this message translates to:
+  /// **'To Purchase'**
+  String get procurementColToPurchaseShort;
+
+  /// No description provided for @procurementSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search name / SKU / category'**
+  String get procurementSearchHint;
+
+  /// No description provided for @procurementAllStatuses.
+  ///
+  /// In en, this message translates to:
+  /// **'All statuses'**
+  String get procurementAllStatuses;
+
+  /// No description provided for @procurementStatusInStock.
+  ///
+  /// In en, this message translates to:
+  /// **'In Stock'**
+  String get procurementStatusInStock;
+
+  /// No description provided for @procurementStatusPartial.
+  ///
+  /// In en, this message translates to:
+  /// **'Partially Available'**
+  String get procurementStatusPartial;
+
+  /// No description provided for @procurementStatusPurchaseRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase Required'**
+  String get procurementStatusPurchaseRequired;
+
+  /// No description provided for @procurementAllWarehouses.
+  ///
+  /// In en, this message translates to:
+  /// **'All warehouses'**
+  String get procurementAllWarehouses;
+
+  /// No description provided for @procurementAllProjects.
+  ///
+  /// In en, this message translates to:
+  /// **'All projects'**
+  String get procurementAllProjects;
+
+  /// No description provided for @procurementProjectsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} projects'**
+  String procurementProjectsCount(int count);
+
+  /// No description provided for @procurementApply.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply'**
+  String get procurementApply;
+
+  /// No description provided for @procurementRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get procurementRefresh;
+
+  /// No description provided for @procurementPrintPdf.
+  ///
+  /// In en, this message translates to:
+  /// **'Print PDF'**
+  String get procurementPrintPdf;
+
+  /// No description provided for @procurementLastCalculated.
+  ///
+  /// In en, this message translates to:
+  /// **'Last calculated: {when}  •  {count} products'**
+  String procurementLastCalculated(String when, int count);
+
+  /// No description provided for @procurementSelectedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} selected'**
+  String procurementSelectedCount(int count);
+
+  /// No description provided for @procurementSwipeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Swipe sideways to see all columns, or use card view below.'**
+  String get procurementSwipeHint;
+
+  /// No description provided for @procurementFullTable.
+  ///
+  /// In en, this message translates to:
+  /// **'Full table (swipe horizontally)'**
+  String get procurementFullTable;
+
+  /// No description provided for @procurementAllProducts.
+  ///
+  /// In en, this message translates to:
+  /// **'All products'**
+  String get procurementAllProducts;
+
+  /// No description provided for @procurementCurrentPageCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Current page ({count})'**
+  String procurementCurrentPageCount(int count);
+
+  /// No description provided for @procurementSelectedProducts.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected products'**
+  String get procurementSelectedProducts;
+
+  /// No description provided for @procurementSelectRowsFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'Select rows with checkboxes first'**
+  String get procurementSelectRowsFirst;
+
+  /// No description provided for @procurementByProject.
+  ///
+  /// In en, this message translates to:
+  /// **'By project'**
+  String get procurementByProject;
+
+  /// No description provided for @procurementChooseOneProject.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose one project'**
+  String get procurementChooseOneProject;
+
+  /// No description provided for @procurementExportExcel.
+  ///
+  /// In en, this message translates to:
+  /// **'Export Excel (CSV)'**
+  String get procurementExportExcel;
+
+  /// No description provided for @procurementNoProjects.
+  ///
+  /// In en, this message translates to:
+  /// **'No projects available'**
+  String get procurementNoProjects;
+
+  /// No description provided for @procurementPrintByProject.
+  ///
+  /// In en, this message translates to:
+  /// **'Print by project'**
+  String get procurementPrintByProject;
+
+  /// No description provided for @procurementNoRowsToPrint.
+  ///
+  /// In en, this message translates to:
+  /// **'No rows to print'**
+  String get procurementNoRowsToPrint;
+
+  /// No description provided for @procurementExcelCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Excel/CSV copied to clipboard — paste into Excel'**
+  String get procurementExcelCopied;
+
+  /// No description provided for @procurementFilterProjects.
+  ///
+  /// In en, this message translates to:
+  /// **'Filter projects'**
+  String get procurementFilterProjects;
+
+  /// No description provided for @procurementClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get procurementClear;
+
+  /// No description provided for @procurementNoData.
+  ///
+  /// In en, this message translates to:
+  /// **'No data for the selected filters'**
+  String get procurementNoData;
+
+  /// No description provided for @procurementLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load Procurement Planning'**
+  String get procurementLoadFailed;
+
+  /// No description provided for @procurementPageOf.
+  ///
+  /// In en, this message translates to:
+  /// **'Page {page} / {total}'**
+  String procurementPageOf(int page, int total);
+
+  /// No description provided for @procurementTotalsProducts.
+  ///
+  /// In en, this message translates to:
+  /// **'Products'**
+  String get procurementTotalsProducts;
+
+  /// No description provided for @procurementTotalsTotalRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Required'**
+  String get procurementTotalsTotalRequired;
+
+  /// No description provided for @procurementTotalsRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'Remaining'**
+  String get procurementTotalsRemaining;
+
+  /// No description provided for @procurementTotalsWarehouseStock.
+  ///
+  /// In en, this message translates to:
+  /// **'Warehouse Stock'**
+  String get procurementTotalsWarehouseStock;
+
+  /// No description provided for @procurementTotalsToPurchase.
+  ///
+  /// In en, this message translates to:
+  /// **'To Purchase'**
+  String get procurementTotalsToPurchase;
+
+  /// No description provided for @procurementPdfSelectedSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected products ({count})'**
+  String procurementPdfSelectedSubtitle(int count);
+
+  /// No description provided for @procurementPdfAllSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'All products ({count})'**
+  String procurementPdfAllSubtitle(int count);
+
+  /// No description provided for @procurementPdfByProject.
+  ///
+  /// In en, this message translates to:
+  /// **'By project: {name}'**
+  String procurementPdfByProject(String name);
+
+  /// No description provided for @procurementPdfPrintedBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Printed by: {name}  |  {when}'**
+  String procurementPdfPrintedBy(String name, String when);
+
+  /// No description provided for @procurementPdfFilters.
+  ///
+  /// In en, this message translates to:
+  /// **'Filters: {summary}'**
+  String procurementPdfFilters(String summary);
+
+  /// No description provided for @procurementPdfTotals.
+  ///
+  /// In en, this message translates to:
+  /// **'Totals'**
+  String get procurementPdfTotals;
+
+  /// No description provided for @procurementPdfNoProductsForProject.
+  ///
+  /// In en, this message translates to:
+  /// **'No products for this project.'**
+  String get procurementPdfNoProductsForProject;
+
+  /// No description provided for @procurementPdfPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Page {page} / {total}'**
+  String procurementPdfPage(int page, int total);
 
   /// No description provided for @reportExportProjectPdf.
   ///
@@ -656,6 +1070,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Approve'**
   String get approve;
+
+  /// No description provided for @sendToAdmin.
+  ///
+  /// In en, this message translates to:
+  /// **'Send to Admin'**
+  String get sendToAdmin;
+
+  /// No description provided for @sendToManager.
+  ///
+  /// In en, this message translates to:
+  /// **'Send to Manager'**
+  String get sendToManager;
+
+  /// No description provided for @editOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit order'**
+  String get editOrder;
+
+  /// No description provided for @orderUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Order updated'**
+  String get orderUpdated;
 
   /// No description provided for @validate.
   ///
@@ -1062,7 +1500,7 @@ abstract class AppLocalizations {
   /// No description provided for @orderQtySupplementaryBreakdown.
   ///
   /// In en, this message translates to:
-  /// **'{remaining} remaining + {supplementary} supplementary → total {total} {unit}'**
+  /// **'{remaining} {unit} + {supplementary} Supplementary'**
   String orderQtySupplementaryBreakdown(
       int remaining, int supplementary, int total, String unit);
 
@@ -1093,7 +1531,7 @@ abstract class AppLocalizations {
   /// No description provided for @approvedQuantities.
   ///
   /// In en, this message translates to:
-  /// **'Approved quantities (by admin):'**
+  /// **'Approved quantities (by manager):'**
   String get approvedQuantities;
 
   /// No description provided for @noProductsLabel.
@@ -1371,6 +1809,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Warehouse User'**
   String get roleWarehouse;
+
+  /// No description provided for @roleManager.
+  ///
+  /// In en, this message translates to:
+  /// **'Manager'**
+  String get roleManager;
+
+  /// No description provided for @roleSupervisor.
+  ///
+  /// In en, this message translates to:
+  /// **'Supervisor'**
+  String get roleSupervisor;
+
+  /// No description provided for @roleFinance.
+  ///
+  /// In en, this message translates to:
+  /// **'Finance'**
+  String get roleFinance;
+
+  /// No description provided for @passwordOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Password (optional)'**
+  String get passwordOptional;
+
+  /// No description provided for @printFullProjectPdf.
+  ///
+  /// In en, this message translates to:
+  /// **'Print full project PDF'**
+  String get printFullProjectPdf;
+
+  /// No description provided for @printCreationDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Print creation date'**
+  String get printCreationDate;
+
+  /// No description provided for @printProjectUpdateNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Print project update #{index}'**
+  String printProjectUpdateNumber(int index);
+
+  /// No description provided for @printAllModifications.
+  ///
+  /// In en, this message translates to:
+  /// **'Print all modifications'**
+  String get printAllModifications;
+
+  /// No description provided for @printAllModificationsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Project history with all changes'**
+  String get printAllModificationsSubtitle;
+
+  /// No description provided for @orderResubmitted.
+  ///
+  /// In en, this message translates to:
+  /// **'Order resubmitted'**
+  String get orderResubmitted;
+
+  /// No description provided for @resubmitToSupervisor.
+  ///
+  /// In en, this message translates to:
+  /// **'Resubmit to Supervisor'**
+  String get resubmitToSupervisor;
+
+  /// No description provided for @couldNotReadImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not read image data. Try another file.'**
+  String get couldNotReadImage;
 
   /// No description provided for @none.
   ///
@@ -1726,6 +2236,24 @@ abstract class AppLocalizations {
   /// **'Requested (BOQ)'**
   String get requestedBoq;
 
+  /// No description provided for @requestedQuantityLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Requested Quantity'**
+  String get requestedQuantityLabel;
+
+  /// No description provided for @qtyAddedByAdminLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Quantity Added by Admin'**
+  String get qtyAddedByAdminLabel;
+
+  /// No description provided for @remainingRequestedLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Remaining Requested Quantity'**
+  String get remainingRequestedLabel;
+
   /// No description provided for @projectQuantitiesNotStockHint.
   ///
   /// In en, this message translates to:
@@ -1990,6 +2518,12 @@ abstract class AppLocalizations {
   /// **'Stock Management'**
   String get appTitle;
 
+  /// No description provided for @brandName.
+  ///
+  /// In en, this message translates to:
+  /// **'Egypt Grid'**
+  String get brandName;
+
   /// No description provided for @noItemsMatchSearch.
   ///
   /// In en, this message translates to:
@@ -2194,6 +2728,72 @@ abstract class AppLocalizations {
   /// **'Order date *'**
   String get orderDateRequired;
 
+  /// No description provided for @expectedArrivalDaysRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Arrive at user within *'**
+  String get expectedArrivalDaysRequired;
+
+  /// No description provided for @arrivalWithinDays.
+  ///
+  /// In en, this message translates to:
+  /// **'{days} day(s)'**
+  String arrivalWithinDays(int days);
+
+  /// No description provided for @expectedArrivalColumn.
+  ///
+  /// In en, this message translates to:
+  /// **'Arrive in: {days} day(s)'**
+  String expectedArrivalColumn(int days);
+
+  /// No description provided for @expectedArrivalDateValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Expected arrival: {date}'**
+  String expectedArrivalDateValue(String date);
+
+  /// No description provided for @orderDistributionDateValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Distribution date: {date}'**
+  String orderDistributionDateValue(String date);
+
+  /// No description provided for @orderArrivalDateValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Arrival date: {date}'**
+  String orderArrivalDateValue(String date);
+
+  /// No description provided for @orderLateByDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Order is late by {days} day(s)'**
+  String orderLateByDays(int days);
+
+  /// No description provided for @confirmOrderArrived.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm order arrived'**
+  String get confirmOrderArrived;
+
+  /// No description provided for @orderArrivedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Order arrived successfully'**
+  String get orderArrivedSuccess;
+
+  /// No description provided for @orderArrivedConfirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'Arrival confirmation sent'**
+  String get orderArrivedConfirmed;
+
+  /// No description provided for @orderArrivedNotification.
+  ///
+  /// In en, this message translates to:
+  /// **'Order arrived successfully'**
+  String get orderArrivedNotification;
+
   /// No description provided for @noItemsFound.
   ///
   /// In en, this message translates to:
@@ -2377,7 +2977,7 @@ abstract class AppLocalizations {
   /// No description provided for @whenAdminApprovesOrderHint.
   ///
   /// In en, this message translates to:
-  /// **'When admin approves an order, it will appear here with quantities.\nUse + to create a distribution manually.'**
+  /// **'When the manager approves an order, it will appear here with quantities.\nUse + to create a distribution manually.'**
   String get whenAdminApprovesOrderHint;
 
   /// No description provided for @orderNumberPrefix.
@@ -2763,6 +3363,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Max: {max}'**
   String maxQtyHintNumber(String max);
+
+  /// No description provided for @insufficientStockReplacePrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Insufficient stock. Would you like to replace this product with one or more products?'**
+  String get insufficientStockReplacePrompt;
+
+  /// No description provided for @outOfStock.
+  ///
+  /// In en, this message translates to:
+  /// **'Out of Stock'**
+  String get outOfStock;
+
+  /// No description provided for @replaceProduct.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace Product'**
+  String get replaceProduct;
+
+  /// No description provided for @productReplacedSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Product Replaced Successfully'**
+  String get productReplacedSuccessfully;
+
+  /// No description provided for @selectReplacementProduct.
+  ///
+  /// In en, this message translates to:
+  /// **'Select replacement product(s)'**
+  String get selectReplacementProduct;
+
+  /// No description provided for @noProductsWithStock.
+  ///
+  /// In en, this message translates to:
+  /// **'No products with available stock.'**
+  String get noProductsWithStock;
+
+  /// No description provided for @originalProduct.
+  ///
+  /// In en, this message translates to:
+  /// **'Original Product'**
+  String get originalProduct;
+
+  /// No description provided for @replacedByProduct.
+  ///
+  /// In en, this message translates to:
+  /// **'Replaced By'**
+  String get replacedByProduct;
+
+  /// No description provided for @replacementDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Replacement Date'**
+  String get replacementDate;
+
+  /// No description provided for @replacedByAdmin.
+  ///
+  /// In en, this message translates to:
+  /// **'Replaced By'**
+  String get replacedByAdmin;
+
+  /// No description provided for @skuLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'SKU'**
+  String get skuLabel;
+
+  /// No description provided for @availableQuantityLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Available Quantity'**
+  String get availableQuantityLabel;
+
+  /// No description provided for @replacementAssignedQty.
+  ///
+  /// In en, this message translates to:
+  /// **'Assigned: {assigned} / {required}'**
+  String replacementAssignedQty(String assigned, String required);
+
+  /// No description provided for @confirmReplacements.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm replacements'**
+  String get confirmReplacements;
+
+  /// No description provided for @replacementQtyMustMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Total replacement quantity must equal {required}.'**
+  String replacementQtyMustMatch(String required);
+
+  /// No description provided for @changeReplacement.
+  ///
+  /// In en, this message translates to:
+  /// **'Change replacement'**
+  String get changeReplacement;
 }
 
 class _AppLocalizationsDelegate

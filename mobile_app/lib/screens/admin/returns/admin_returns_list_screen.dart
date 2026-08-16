@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../models/return_model.dart';
 import '../../../models/store.dart';
+import '../../../providers/auth_provider.dart';
 import '../../../services/api_service.dart';
 import '../../../theme/app_theme.dart';
 import '../../../utils/embedded_ref_localized.dart';
 import '../../../utils/l10n_ui_helpers.dart';
+import '../../../utils/roles.dart';
 import '../../../utils/store_localized.dart';
 import '../../../widgets/connection_error_widget.dart';
 import '../../../widgets/app_card.dart';
@@ -49,6 +52,11 @@ class _AdminReturnsListScreenState extends State<AdminReturnsListScreen> {
         (r.user?.name.toLowerCase().contains(q) ?? false) ||
         (r.user?.nameAr?.toLowerCase().contains(q) ?? false) ||
         r.status.toLowerCase().contains(q)).toList();
+  }
+
+  bool get _canApprove {
+    final role = context.read<AuthProvider>().user?.role;
+    return isAdminLike(role) || isWarehouseLike(role);
   }
 
   Future<void> _loadReturns() async {
@@ -194,7 +202,7 @@ class _AdminReturnsListScreenState extends State<AdminReturnsListScreen> {
                 const SizedBox(height: 16),
                 Text(l10n.notesLabel(returnItem.notes!), style: AppTheme.appTextStyle(context, color: AppTheme.textSecondary)),
               ],
-              if (returnItem.status == 'pending') ...[
+              if (returnItem.status == 'pending' && _canApprove) ...[
                 const SizedBox(height: 24),
                 SizedBox(
                   width: double.infinity,

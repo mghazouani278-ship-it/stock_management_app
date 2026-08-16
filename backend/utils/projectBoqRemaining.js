@@ -33,9 +33,11 @@ async function loadDistributedMapsForProject(firestore, projectId) {
   for (const d of distSnap.docs) {
     const distData = d.data();
     for (const p of (distData.products || [])) {
-      const pid = p.product?.id ?? p.product?._id ?? p.product;
+      // Attribute BOQ / distributed totals to the originally requested product when replaced.
+      const pid = p.original_product_id ?? p.originalProductId ?? p.product?.id ?? p.product?._id ?? p.product;
       if (!pid) continue;
-      const pColor = p.color ? String(p.color).trim().toLowerCase() : null;
+      const pColorRaw = p.original_color ?? p.originalColor ?? p.color;
+      const pColor = pColorRaw ? String(pColorRaw).trim().toLowerCase() : null;
       const qty = parseQtyField(p.quantity);
       if (qty <= 0) continue;
       distributedByProduct[pid] = (distributedByProduct[pid] ?? 0) + qty;
@@ -47,13 +49,10 @@ async function loadDistributedMapsForProject(firestore, projectId) {
 }
 
 /**
- * BOQ quantity still allocatable to new orders (matches Flutter _remainingAllocatedFor).
- * Uses requested − distributed, not stale `products` map alone.
+ * Remaining quantity still allocatable to new orders.
+ * Source of truth: project `products` map (increased by admin ADD, decreased by orders).
  */
-function computeRemainingBoqAllocatable({ requestedQty, distributedQty, allowedInMap }) {
-  if (requestedQty > 0) {
-    return Math.max(0, requestedQty - distributedQty);
-  }
+function computeRemainingBoqAllocatable({ allowedInMap }) {
   return Math.max(0, parseProjectProductQty(allowedInMap));
 }
 

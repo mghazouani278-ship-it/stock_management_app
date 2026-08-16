@@ -25,6 +25,8 @@ class User {
   final String email;
   final String role;
   final Project? project;
+  final List<Project> projects;
+  final List<String> projectIds;
   final bool isActive;
 
   User({
@@ -34,17 +36,41 @@ class User {
     required this.email,
     required this.role,
     this.project,
+    this.projects = const [],
+    this.projectIds = const [],
     required this.isActive,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
+    final projectsList = <Project>[];
+    if (json['projects'] is List) {
+      for (final p in json['projects'] as List) {
+        if (p is Map) projectsList.add(Project.fromJson(Map<String, dynamic>.from(p)));
+      }
+    }
+    final ids = <String>[];
+    if (json['projectIds'] is List) {
+      ids.addAll((json['projectIds'] as List).map((e) => e.toString()));
+    } else if (json['project_ids'] is List) {
+      ids.addAll((json['project_ids'] as List).map((e) => e.toString()));
+    }
+    final primary = json['project'] != null
+        ? Project.fromJson(Map<String, dynamic>.from(json['project'] as Map))
+        : (projectsList.isNotEmpty ? projectsList.first : null);
+    if (primary != null && projectsList.every((p) => p.id != primary.id)) {
+      projectsList.insert(0, primary);
+    }
+    if (primary != null && !ids.contains(primary.id)) ids.insert(0, primary.id);
+
     return User(
       id: json['id'] ?? json['_id'] ?? '',
       name: json['name'] ?? '',
       nameAr: json['nameAr']?.toString() ?? json['name_ar']?.toString(),
       email: json['email'] ?? '',
       role: json['role'] ?? 'user',
-      project: json['project'] != null ? Project.fromJson(json['project']) : null,
+      project: primary,
+      projects: projectsList,
+      projectIds: ids,
       isActive: json['isActive'] ?? true,
     );
   }
@@ -58,6 +84,8 @@ class User {
       'email': email,
       'role': role,
       'project': project?.toJson(),
+      'projects': projects.map((p) => p.toJson()).toList(),
+      'projectIds': projectIds,
       'isActive': isActive,
     };
   }

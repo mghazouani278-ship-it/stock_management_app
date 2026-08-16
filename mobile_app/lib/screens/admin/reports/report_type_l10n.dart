@@ -16,6 +16,8 @@ extension ReportTypeL10n on ReportType {
         return l10n.reportStockHistoryMenu;
       case ReportType.projects:
         return l10n.reportProjectsMenu;
+      case ReportType.mrp:
+        return l10n.procurementPlanningMenu;
     }
   }
 
@@ -33,6 +35,8 @@ extension ReportTypeL10n on ReportType {
         return l10n.reportStockHistory;
       case ReportType.projects:
         return l10n.reportProjects;
+      case ReportType.mrp:
+        return l10n.procurementPlanning;
     }
   }
 
@@ -50,6 +54,8 @@ extension ReportTypeL10n on ReportType {
         return l10n.reportDeleteTypeStockEntry;
       case ReportType.projects:
         return l10n.reportProjects;
+      case ReportType.mrp:
+        return l10n.procurementPlanning;
     }
   }
 }

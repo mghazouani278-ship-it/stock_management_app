@@ -3,8 +3,9 @@ import 'package:provider/provider.dart';
 import '../../navigation/app_route_observer.dart';
 import '../../providers/auth_provider.dart';
 import '../../l10n/app_localizations.dart';
+import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
-import '../../utils/project_localized.dart';
+import '../../utils/l10n_ui_helpers.dart';
 import '../../widgets/language_selector.dart';
 import '../../widgets/menu_card.dart';
 import '../auth/login_screen.dart';
@@ -20,10 +21,24 @@ class UserHomeScreen extends StatefulWidget {
 }
 
 class _UserHomeScreenState extends State<UserHomeScreen> with RouteAware, WidgetsBindingObserver {
+  final ApiService _apiService = ApiService();
+  int _orderNotificationsCount = 0;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadBadgeCounts());
+  }
+
+  Future<void> _loadBadgeCounts() async {
+    try {
+      final res = await _apiService.get('/order-notifications/count');
+      if (!mounted) return;
+      if (res['success'] == true) {
+        setState(() => _orderNotificationsCount = (res['count'] as num?)?.toInt() ?? 0);
+      }
+    } catch (_) {}
   }
 
   @override
@@ -46,12 +61,14 @@ class _UserHomeScreenState extends State<UserHomeScreen> with RouteAware, Widget
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _refreshUser();
+      _loadBadgeCounts();
     }
   }
 
   @override
   void didPopNext() {
     _refreshUser();
+    _loadBadgeCounts();
   }
 
   void _refreshUser() {
@@ -66,8 +83,10 @@ class _UserHomeScreenState extends State<UserHomeScreen> with RouteAware, Widget
     final l10n = AppLocalizations.of(context)!;
     final authProvider = Provider.of<AuthProvider>(context);
     final user = authProvider.user;
-    final projectOwnerLine =
-        user?.project != null ? user!.project!.displayOwner(context) : null;
+    final userName = user != null
+        ? localizedDisplayUserName(context, user.name, nameAr: user.nameAr)
+        : '';
+    final userEmail = user?.email.trim() ?? '';
 
     return Scaffold(
       backgroundColor: AppTheme.background,
@@ -124,7 +143,7 @@ class _UserHomeScreenState extends State<UserHomeScreen> with RouteAware, Widget
         child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
-          if (user?.project != null)
+          if (user != null)
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.all(AppTheme.spaceMd),
@@ -163,8 +182,8 @@ class _UserHomeScreenState extends State<UserHomeScreen> with RouteAware, Widget
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              l10n.project,
-                              style: AppTheme.appTextStyle(context, 
+                              l10n.dashboard,
+                              style: AppTheme.appTextStyle(context,
                                 fontSize: 12,
                                 fontWeight: FontWeight.w500,
                                 color: Colors.white.withOpacity(0.9),
@@ -172,18 +191,18 @@ class _UserHomeScreenState extends State<UserHomeScreen> with RouteAware, Widget
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              user!.project!.displayName(context),
-                              style: AppTheme.appTextStyle(context, 
+                              userName,
+                              style: AppTheme.appTextStyle(context,
                                 fontSize: 14,
                                 fontWeight: FontWeight.w700,
                                 color: Colors.white,
                               ),
                             ),
-                            if (projectOwnerLine != null && projectOwnerLine.trim().isNotEmpty) ...[
+                            if (userEmail.isNotEmpty) ...[
                               const SizedBox(height: 4),
                               Text(
-                                '${l10n.owner}: $projectOwnerLine',
-                                style: AppTheme.appTextStyle(context, 
+                                userEmail,
+                                style: AppTheme.appTextStyle(context,
                                   fontSize: 14,
                                   color: Colors.white.withOpacity(0.9),
                                 ),
@@ -202,7 +221,7 @@ class _UserHomeScreenState extends State<UserHomeScreen> with RouteAware, Widget
               padding: const EdgeInsets.fromLTRB(AppTheme.spaceMd, AppTheme.spaceSm, AppTheme.spaceMd, AppTheme.spaceSm),
               child: Text(
                 l10n.dashboard,
-                style: AppTheme.appTextStyle(context, 
+                style: AppTheme.appTextStyle(context,
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
                   color: AppTheme.textPrimary,
@@ -223,7 +242,12 @@ class _UserHomeScreenState extends State<UserHomeScreen> with RouteAware, Widget
                       title: l10n.orders,
                       icon: Icons.receipt_long_rounded,
                       accentColor: const Color(0xFF6366F1),
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OrdersListScreen())),
+                      onTap: () async {
+                        if (!mounted) return;
+                        await Navigator.push(context, MaterialPageRoute(builder: (_) => const OrdersListScreen()));
+                        if (mounted) _loadBadgeCounts();
+                      },
+                      badgeCount: _orderNotificationsCount > 0 ? _orderNotificationsCount : null,
                       transparent: true,
                       titleFontSize: 14,
                     ),

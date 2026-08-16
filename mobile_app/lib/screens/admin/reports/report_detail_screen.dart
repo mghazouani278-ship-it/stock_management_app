@@ -15,6 +15,7 @@ import '../../../widgets/connection_error_widget.dart';
 import '../../../widgets/count_badge.dart';
 import 'reports_screen.dart';
 import 'report_type_l10n.dart';
+import 'taking_delivery_detail.dart';
 import '../../../navigation/app_route_observer.dart';
 
 class ReportDetailScreen extends StatefulWidget {
@@ -270,7 +271,9 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> with RouteAware
                             ],
                           ),
                         ),
-                        if (widget.allowDelete && widget.reportType != ReportType.projects)
+                        if (widget.allowDelete &&
+                            widget.reportType != ReportType.projects &&
+                            widget.reportType != ReportType.distributions)
                           PopupMenuItem(
                             value: 'delete',
                             child: Row(
@@ -321,6 +324,8 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> with RouteAware
         final proj = Project.fromJson(Map<String, dynamic>.from(item));
         final n = proj.displayName(context);
         return n.isNotEmpty ? n : l10n.project;
+      case ReportType.mrp:
+        return AppLocalizations.of(context)!.procurementPlanning;
     }
   }
 
@@ -399,6 +404,8 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> with RouteAware
         if (createdStr != null) lines.add('${l10n.creationDate} $createdStr');
         if (updatedStr != null) lines.add('${l10n.projectLastEditDateLabel} $updatedStr');
         return lines.isEmpty ? l10n.reportProjects : lines.join('\n');
+      case ReportType.mrp:
+        return '';
     }
   }
 
@@ -529,6 +536,8 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> with RouteAware
           break;
         case ReportType.projects:
           return;
+        case ReportType.mrp:
+          return;
       }
       await _apiService.delete(endpoint);
       if (mounted) {
@@ -550,6 +559,10 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> with RouteAware
   }
 
   Future<void> _showItemDetails(Map<String, dynamic> item) async {
+    if (widget.reportType == ReportType.distributions) {
+      await showTakingDeliveryDetails(context: context, distribution: item);
+      return;
+    }
     var effectiveItem = item;
     if (widget.reportType == ReportType.projects) {
       final id = item['id']?.toString();
@@ -634,10 +647,9 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> with RouteAware
   Widget _projectProductCard(BuildContext context, ProjectProduct p, AppLocalizations l10n) {
     final requested = p.requestedQuantity;
     final distRaw = p.distributedQuantity;
-    final distQty = distRaw.clamp(0, requested).toInt();
-    // Rest (BOQ) = requested − covered toward BOQ (not stale allowedQuantity from Firestore).
-    final int remaining = distRaw >= requested ? 0 : requested - distRaw;
-    final supplementaryDisplay = distQty >= requested ? p.supplementaryQuantity : 0;
+    final distQty = distRaw.clamp(0, requested > 0 ? requested : distRaw).toInt();
+    final int remaining = p.allowedQuantity < 0 ? 0 : p.allowedQuantity;
+    final supplementaryDisplay = distQty >= requested && requested > 0 ? p.supplementaryQuantity : 0;
     return Padding(
       padding: const EdgeInsets.only(bottom: AppTheme.spaceSm),
       child: AppCard(
@@ -654,9 +666,9 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> with RouteAware
               spacing: 8,
               runSpacing: 6,
               children: [
-                _projectQtyChip(context, l10n.requestedBoq, requested, Colors.blue),
+                _projectQtyChip(context, l10n.requestedQuantityLabel, requested, Colors.blue),
                 _projectQtyChip(context, l10n.distributed, distQty, Colors.green),
-                _projectQtyChip(context, l10n.quantityRest, remaining, Colors.blueGrey),
+                _projectQtyChip(context, l10n.remainingRequestedLabel, remaining, Colors.blueGrey),
                 _projectQtyChip(context, l10n.supplementary, supplementaryDisplay, Colors.orange),
               ],
             ),
@@ -924,7 +936,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> with RouteAware
                           ),
                           ListTile(
                             leading: const Icon(Icons.picture_as_pdf_outlined),
-                            title: const Text('Print full project PDF'),
+                            title: Text(l10n.printFullProjectPdf),
                             onTap: () {
                               Navigator.pop(ctx);
                               ProjectReportPdf.export(
@@ -936,7 +948,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> with RouteAware
                           ),
                           ListTile(
                             leading: const Icon(Icons.date_range_outlined),
-                            title: const Text('Print creation date'),
+                            title: Text(l10n.printCreationDate),
                             subtitle: Text(createdStr),
                             onTap: () {
                               Navigator.pop(ctx);
@@ -950,7 +962,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> with RouteAware
                           for (int i = 0; i < updates.length; i++)
                             ListTile(
                               leading: const Icon(Icons.update_outlined),
-                              title: Text('Print project update #${i + 1}'),
+                              title: Text(l10n.printProjectUpdateNumber(i + 1)),
                               subtitle: Text(
                                 L10nFormatters.formatDateTime(
                                   context,
@@ -969,8 +981,8 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> with RouteAware
                             ),
                           ListTile(
                             leading: const Icon(Icons.history_outlined),
-                            title: const Text('Print all modifications'),
-                            subtitle: const Text('Project history with all changes'),
+                            title: Text(l10n.printAllModifications),
+                            subtitle: Text(l10n.printAllModificationsSubtitle),
                             onTap: () {
                               Navigator.pop(ctx);
                               ProjectReportPdf.export(
@@ -1372,12 +1384,53 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> with RouteAware
           if (v is Map) {
             final prod = v['product'];
             final qty = v['quantity'];
-            addLine(
-              '  ${i + 1}',
-              prod != null
-                  ? '${prod['name'] != null && prod['name'].toString().trim().isNotEmpty ? localizedApiProductName(context, prod['name'].toString()) : l10n.product}: $qty'
-                  : v.toString(),
-            );
+            final isReplaced = v['isReplaced'] == true || v['is_replaced'] == true;
+            String productLabelFrom(dynamic raw) {
+              if (raw is Map) {
+                final n = raw['name']?.toString();
+                if (n != null && n.trim().isNotEmpty) {
+                  return localizedApiProductName(context, n);
+                }
+                final id = raw['id']?.toString();
+                if (id != null && id.isNotEmpty) return localizedApiProductName(context, id);
+                return l10n.product;
+              }
+              if (raw != null && raw.toString().trim().isNotEmpty) {
+                return localizedApiProductName(context, raw.toString());
+              }
+              return l10n.product;
+            }
+            if (isReplaced &&
+                (widget.reportType == ReportType.distributions || widget.reportType == ReportType.orders)) {
+              final original = v['originalProduct'] ?? v['original_product'];
+              final replacement = v['replacementProduct'] ?? v['replacement_product'] ?? prod;
+              final replacedBy = v['replacedBy'] ?? v['replaced_by'];
+              final originalName = original is Map
+                  ? (original['name']?.toString() ?? original['id']?.toString() ?? '')
+                  : (v['originalProductId']?.toString() ?? original?.toString() ?? '');
+              final replacementName = replacement is Map
+                  ? (replacement['name']?.toString() ?? replacement['id']?.toString() ?? '')
+                  : (replacement?.toString() ?? '');
+              final byName = replacedBy is Map
+                  ? (replacedBy['name']?.toString() ?? '')
+                  : (replacedBy?.toString() ?? '');
+              final replacedAt = v['replacedAt'] ?? v['replaced_at'];
+              final replacedAtStr = L10nFormatters.formatDateOnlyFromApi(context, replacedAt)
+                  ?? (replacedAt?.toString().split('T').first ?? '');
+              addLine(
+                '  ${i + 1}',
+                '${l10n.originalProduct}: ${originalName.isNotEmpty ? localizedApiProductName(context, originalName) : l10n.product}'
+                ' | ${l10n.replacedByProduct}: ${replacementName.isNotEmpty ? localizedApiProductName(context, replacementName) : l10n.product}'
+                ' | ${l10n.quantity}: $qty'
+                '${byName.isNotEmpty ? ' | ${l10n.replacedByAdmin}: $byName' : ''}'
+                '${replacedAtStr.isNotEmpty ? ' | ${l10n.replacementDate}: $replacedAtStr' : ''}',
+              );
+            } else {
+              addLine(
+                '  ${i + 1}',
+                prod != null ? '${productLabelFrom(prod)}: $qty' : v.toString(),
+              );
+            }
           } else {
             addLine('  ${i + 1}', v.toString());
           }

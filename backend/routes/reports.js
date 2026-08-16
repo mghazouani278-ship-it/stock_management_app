@@ -1,11 +1,18 @@
 const express = require('express');
 const router = express.Router();
-const { getFirestore } = require('../firebase');
-const { protect, authorize, authorizeAdminOrWarehouse } = require('../middleware/auth');
+const { getFirestore, admin } = require('../firebase');
+const {protect, authorize, authorizeAdminOrWarehouse, authorizeAdminLike, authorizeStockRead} = require('../middleware/auth');
 const ordersRoute = require('./orders');
 const returnsRoute = require('./returns');
 const damagedRoute = require('./damagedProducts');
 const { projectRef, storeRef, userRef } = require('../utils/embedRefs');
+const { buildMrpRows, sortMrpRows, summarizeMrp } = require('../utils/mrpReport');
+const {
+  isAdminLike,
+  isFinance,
+  isWarehouseLike,
+  isSupervisor,
+} = require('../utils/roles');
 
 router.get('/stock-summary', protect, authorizeAdminOrWarehouse, async (req, res) => {
   try {
@@ -63,7 +70,44 @@ router.get('/distributions', protect, authorizeAdminOrWarehouse, async (req, res
         bonAlimentation: data.bon_alimentation,
         project: projectRef(projectDoc),
         store: store?.exists ? storeRef(store) : null,
-        products: (data.products || []).map(p => ({ product: { id: p.product }, quantity: p.quantity })),
+        products: await Promise.all((data.products || []).map(async (p) => {
+          const pid = p.product?.id ?? p.product;
+          const originalId = p.original_product_id ?? p.originalProductId ?? null;
+          const replacementId = p.replacement_product_id ?? p.replacementProductId ?? null;
+          const isReplaced = !!(p.is_replaced ?? p.isReplaced ?? replacementId);
+          const productDoc = pid ? await firestore.collection('products').doc(String(pid)).get() : null;
+          const out = {
+            product: {
+              id: pid,
+              name: productDoc?.exists ? productDoc.data().name : null,
+              unit: productDoc?.exists ? (productDoc.data().unit || null) : null,
+            },
+            quantity: p.quantity,
+            isReplaced,
+            originalProductId: originalId ? String(originalId) : null,
+            replacementProductId: replacementId ? String(replacementId) : null,
+            replacedAt: p.replaced_at ?? p.replacedAt ?? null,
+          };
+          if (originalId) {
+            const od = await firestore.collection('products').doc(String(originalId)).get();
+            out.originalProduct = od.exists
+              ? { id: od.id, name: od.data().name, unit: od.data().unit || null }
+              : { id: String(originalId) };
+          }
+          if (replacementId) {
+            const rd = await firestore.collection('products').doc(String(replacementId)).get();
+            out.replacementProduct = rd.exists
+              ? { id: rd.id, name: rd.data().name, unit: rd.data().unit || null }
+              : { id: String(replacementId) };
+          }
+          if (p.replaced_by) {
+            const ub = await firestore.collection('users').doc(String(p.replaced_by)).get();
+            out.replacedBy = ub.exists
+              ? { id: ub.id, name: ub.data().name, email: ub.data().email }
+              : { id: String(p.replaced_by) };
+          }
+          return out;
+        })),
         validatedBy: validatedByDoc?.exists ? (() => {
         const n = validatedByDoc.data().name;
         const name = (n && (String(n).toLowerCase() === 'administrator' || String(n).toLowerCase() === 'administrateur')) ? 'administrator' : n;
@@ -132,7 +176,7 @@ router.get('/damaged-products', protect, authorizeAdminOrWarehouse, async (req, 
   }
 });
 
-router.get('/stock-history', protect, authorizeAdminOrWarehouse, async (req, res) => {
+router.get('/stock-history', protect, authorizeStockRead, async (req, res) => {
   try {
     const firestore = getFirestore();
     let q = firestore.collection('stock_history').orderBy('created_at', 'desc').limit(1000);
@@ -176,7 +220,7 @@ router.get('/stock-history', protect, authorizeAdminOrWarehouse, async (req, res
   }
 });
 
-router.delete('/stock-history/:id', protect, authorize('admin'), async (req, res) => {
+router.delete('/stock-history/:id', protect, authorizeAdminLike, async (req, res) => {
   try {
     const firestore = getFirestore();
     const ref = firestore.collection('stock_history').doc(req.params.id);
@@ -184,6 +228,167 @@ router.delete('/stock-history/:id', protect, authorize('admin'), async (req, res
     if (!doc.exists) return res.status(404).json({ success: false, message: 'Stock history entry not found' });
     await ref.delete();
     res.json({ success: true, message: 'Stock history entry deleted' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+function authorizeMrpAccess(req, res, next) {
+  const role = req.user?.role;
+  if (isAdminLike(role) || isFinance(role) || isWarehouseLike(role)) {
+    return next();
+  }
+  return res.status(403).json({
+    success: false,
+    message: `User role '${role}' is not authorized to access MRP reports`,
+  });
+}
+
+/**
+ * GET /reports/mrp
+ * Query:
+ *  page, pageSize, sortBy, sortDir,
+ *  search, status (in_stock|partial|purchase_required),
+ *  category, warehouseId,
+ *  projectIds (comma-separated), productIds (comma-separated)
+ */
+let _mrpCache = { at: 0, key: '', rows: null };
+const MRP_CACHE_TTL_MS = 45000;
+
+router.get('/mrp', protect, authorizeMrpAccess, async (req, res) => {
+  try {
+    const firestore = getFirestore();
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const pageSize = Math.min(200, Math.max(1, parseInt(req.query.pageSize, 10) || 50));
+    const sortBy = req.query.sortBy || 'product';
+    const sortDir = req.query.sortDir || 'asc';
+
+    let projectIds = req.query.projectIds
+      ? String(req.query.projectIds).split(',').map((s) => s.trim()).filter(Boolean)
+      : [];
+    if (req.query.project) projectIds.push(String(req.query.project));
+    projectIds = [...new Set(projectIds)];
+
+    // Supervisor: restrict to assigned projects
+    if (isSupervisor(req.user.role)) {
+      const allowed = (req.user.project_ids || []).map(String);
+      if (projectIds.length === 0) {
+        projectIds = allowed;
+      } else {
+        projectIds = projectIds.filter((id) => allowed.includes(id));
+      }
+      if (projectIds.length === 0) {
+        return res.json({
+          success: true,
+          count: 0,
+          page,
+          pageSize,
+          totalPages: 0,
+          data: [],
+          totals: summarizeMrp([]),
+          calculatedAt: new Date().toISOString(),
+        });
+      }
+    }
+
+    const productIds = req.query.productIds
+      ? String(req.query.productIds).split(',').map((s) => s.trim()).filter(Boolean)
+      : [];
+
+    const filterKey = JSON.stringify({
+      projectIds: projectIds.slice().sort(),
+      productIds: productIds.slice().sort(),
+      warehouseId: req.query.warehouseId || req.query.storeId || null,
+      category: req.query.category || null,
+      status: req.query.status || null,
+      search: req.query.search || null,
+    });
+
+    let rows;
+    const now = Date.now();
+    if (_mrpCache.rows && _mrpCache.key === filterKey && now - _mrpCache.at < MRP_CACHE_TTL_MS) {
+      rows = _mrpCache.rows;
+    } else {
+      const [projectsSnap, stockSnap, ordersSnap, distSnap, productsSnap] = await Promise.all([
+        firestore.collection('projects').get(),
+        firestore.collection('stock').get(),
+        firestore.collection('orders').where('status', '==', 'approved').get(),
+        firestore.collection('distributions').get(),
+        firestore.collection('products').get(),
+      ]);
+
+      const productCache = new Map();
+      for (const d of productsSnap.docs) {
+        productCache.set(d.id, d.data());
+      }
+
+      rows = buildMrpRows({
+        projectDocs: projectsSnap.docs,
+        stockDocs: stockSnap.docs,
+        orderDocs: ordersSnap.docs,
+        distributionDocs: distSnap.docs,
+        productCache,
+        filters: {
+          projectIds: projectIds.length ? projectIds : null,
+          productIds: productIds.length ? productIds : null,
+          warehouseId: req.query.warehouseId || req.query.storeId || null,
+          category: req.query.category || null,
+          status: req.query.status || null,
+          search: req.query.search || null,
+        },
+      });
+      _mrpCache = { at: now, key: filterKey, rows };
+    }
+
+    rows = sortMrpRows(rows, sortBy, sortDir);
+    const totals = summarizeMrp(rows);
+    const totalCount = rows.length;
+    const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+    const start = (page - 1) * pageSize;
+    const pageRows = rows.slice(start, start + pageSize);
+
+    res.json({
+      success: true,
+      count: totalCount,
+      page,
+      pageSize,
+      totalPages,
+      data: pageRows,
+      totals,
+      calculatedAt: new Date(_mrpCache.at || Date.now()).toISOString(),
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/** Audit log for print / export */
+router.post('/mrp/audit', protect, authorizeMrpAccess, async (req, res) => {
+  try {
+    const firestore = getFirestore();
+    const { action, selectedProducts, filters } = req.body || {};
+    const allowed = ['print', 'export_pdf', 'export_excel'];
+    if (!allowed.includes(action)) {
+      return res.status(400).json({ success: false, message: 'Invalid action' });
+    }
+    const ip =
+      req.headers['x-forwarded-for']?.toString().split(',')[0]?.trim() ||
+      req.socket?.remoteAddress ||
+      null;
+
+    await firestore.collection('report_audit').add({
+      report: 'mrp',
+      action,
+      user_id: req.user.id,
+      user_name: req.user.name,
+      user_role: req.user.role,
+      selected_products: selectedProducts || [],
+      filters: filters || {},
+      ip,
+      created_at: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    res.json({ success: true });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

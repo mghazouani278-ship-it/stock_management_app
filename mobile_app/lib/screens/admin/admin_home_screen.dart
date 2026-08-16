@@ -4,6 +4,7 @@ import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/roles.dart';
 import '../../widgets/language_selector.dart';
 import '../../widgets/menu_card.dart';
 import '../auth/login_screen.dart';
@@ -41,11 +42,15 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
 
   Future<void> _loadBadgeCounts() async {
     try {
+      final role = Provider.of<AuthProvider>(context, listen: false).user?.role;
+      final pendingStatus = isManager(role)
+          ? 'pending_manager'
+          : (isAdmin(role) ? 'pending_admin' : 'pending');
       final results = await Future.wait([
-        _apiService.get('/orders', queryParams: {'status': 'pending'}),
+        _apiService.get('/orders/count', queryParams: {'status': pendingStatus}),
         _apiService.get('/order-notifications/count'),
-        _apiService.get('/returns', queryParams: {'status': 'pending'}),
-        _apiService.get('/distributions', queryParams: {'status': 'pending'}),
+        _apiService.get('/returns/count', queryParams: {'status': 'pending'}),
+        _apiService.get('/distributions/count', queryParams: {'status': 'pending'}),
         _apiService.get('/distribution-notifications/count'),
         _apiService.get('/distribution-notifications/admin-completed/count'),
         _apiService.get('/stock/notifications-count'),
@@ -62,17 +67,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         });
       }
     } catch (_) {
-      if (mounted) {
-        setState(() {
-          _pendingOrdersCount = 0;
-          _orderNotificationsCount = 0;
-          _pendingReturnsCount = 0;
-          _pendingDistributionsCount = 0;
-          _distributionNotificationsCount = 0;
-          _distributionCompletedCount = 0;
-          _stockCount = 0;
-        });
-      }
+      // Keep last known badge counts on transient errors (avoid clearing then flickering).
     }
   }
 
@@ -183,10 +178,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     if (mounted) _loadBadgeCounts();
                   });
                 }, badgeCount: _stockCount > 0 ? _stockCount : null),
-                _buildMenuCard(context, l10n.orders, Icons.receipt_long_rounded, const Color(0xFF10B981), () {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminOrdersListScreen())).then((_) {
-                    if (mounted) _loadBadgeCounts();
-                  });
+                _buildMenuCard(context, l10n.orders, Icons.receipt_long_rounded, const Color(0xFF10B981), () async {
+                  if (!mounted) return;
+                  await Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminOrdersListScreen()));
+                  if (mounted) _loadBadgeCounts();
                 }, badgeCount: (_pendingOrdersCount > 0 || _orderNotificationsCount > 0) ? (_pendingOrdersCount > _orderNotificationsCount ? _pendingOrdersCount : _orderNotificationsCount) : null),
                 _buildMenuCard(context, l10n.returns, Icons.replay_rounded, const Color(0xFFF59E0B), () {
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminReturnsListScreen())).then((_) {

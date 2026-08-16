@@ -40,14 +40,147 @@
   "searchReportsHint": "Search reports...",
   "noReportTypesMatchSearch": "No report types match your search.",
   "searchReportHint": "Search report...",
-  "reportValidatedDistributions": "Validated Distributions",
-  "reportValidatedDistributionsMenu": "Validated\nDistributions",
+  "reportValidatedDistributions": "Taking Delivery",
+  "reportValidatedDistributionsMenu": "Taking\nDelivery",
+  "reportTakingDelivery": "Taking Delivery",
+  "takingDeliveryProjectCreated": "Project creation date",
+  "takingDeliveryProjectOwner": "Project owner",
+  "takingDeliveryQtyDistributed": "Qty distributed",
+  "takingDeliveryQtyRemaining": "Qty remaining",
+  "takingDeliveryReplacements": "Product replacements",
+  "takingDeliveryTimeline": "Order timeline",
+  "takingDeliveryUserOrderDate": "User order date",
+  "takingDeliverySupervisorToAdmin": "Supervisor sent to admin",
+  "takingDeliveryAdminToManager": "Admin sent to manager",
+  "takingDeliveryManagerApproved": "Manager approved",
+  "takingDeliveryWarehouseDistributed": "Warehouse distribution date",
+  "takingDeliveryArrivedAtUser": "Arrival at user",
+  "takingDeliveryArrivalAt": "Arrival at {name}",
+  "@takingDeliveryArrivalAt": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
   "reportApprovedReturns": "Approved Returns",
   "reportApprovedReturnsMenu": "Approved\nReturns",
   "reportStockHistory": "Stock History",
   "reportStockHistoryMenu": "Stock\nHistory",
   "reportProjects": "Projects",
   "reportProjectsMenu": "Projects",
+  "procurementPlanning": "Procurement Planning",
+  "procurementPlanningMenu": "Procurement\nPlanning",
+  "procurementColRequiredPerProject": "Required Qty / Project",
+  "procurementColTotalRequired": "Total Required Qty",
+  "procurementColRemaining": "Remaining to Supply",
+  "procurementColWarehouseStock": "Warehouse Stock",
+  "procurementColQtyToPurchase": "Quantity to Purchase",
+  "procurementColTotalRequiredShort": "Total Required",
+  "procurementColRemainingShort": "Remaining",
+  "procurementColWhStockShort": "WH Stock",
+  "procurementColToPurchaseShort": "To Purchase",
+  "procurementSearchHint": "Search name / SKU / category",
+  "procurementAllStatuses": "All statuses",
+  "procurementStatusInStock": "In Stock",
+  "procurementStatusPartial": "Partially Available",
+  "procurementStatusPurchaseRequired": "Purchase Required",
+  "procurementAllWarehouses": "All warehouses",
+  "procurementAllProjects": "All projects",
+  "procurementProjectsCount": "{count} projects",
+  "@procurementProjectsCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "procurementApply": "Apply",
+  "procurementRefresh": "Refresh",
+  "procurementPrintPdf": "Print PDF",
+  "procurementLastCalculated": "Last calculated: {when}  •  {count} products",
+  "@procurementLastCalculated": {
+    "placeholders": {
+      "when": {"type": "String"},
+      "count": {"type": "int"}
+    }
+  },
+  "procurementSelectedCount": "{count} selected",
+  "@procurementSelectedCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "procurementSwipeHint": "Swipe sideways to see all columns, or use card view below.",
+  "procurementFullTable": "Full table (swipe horizontally)",
+  "procurementAllProducts": "All products",
+  "procurementCurrentPageCount": "Current page ({count})",
+  "@procurementCurrentPageCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "procurementSelectedProducts": "Selected products",
+  "procurementSelectRowsFirst": "Select rows with checkboxes first",
+  "procurementByProject": "By project",
+  "procurementChooseOneProject": "Choose one project",
+  "procurementExportExcel": "Export Excel (CSV)",
+  "procurementNoProjects": "No projects available",
+  "procurementPrintByProject": "Print by project",
+  "procurementNoRowsToPrint": "No rows to print",
+  "procurementExcelCopied": "Excel/CSV copied to clipboard — paste into Excel",
+  "procurementFilterProjects": "Filter projects",
+  "procurementClear": "Clear",
+  "procurementNoData": "No data for the selected filters",
+  "procurementLoadFailed": "Failed to load Procurement Planning",
+  "procurementPageOf": "Page {page} / {total}",
+  "@procurementPageOf": {
+    "placeholders": {
+      "page": {"type": "int"},
+      "total": {"type": "int"}
+    }
+  },
+  "procurementTotalsProducts": "Products",
+  "procurementTotalsTotalRequired": "Total Required",
+  "procurementTotalsRemaining": "Remaining",
+  "procurementTotalsWarehouseStock": "Warehouse Stock",
+  "procurementTotalsToPurchase": "To Purchase",
+  "procurementPdfSelectedSubtitle": "Selected products ({count})",
+  "@procurementPdfSelectedSubtitle": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "procurementPdfAllSubtitle": "All products ({count})",
+  "@procurementPdfAllSubtitle": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "procurementPdfByProject": "By project: {name}",
+  "@procurementPdfByProject": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "procurementPdfPrintedBy": "Printed by: {name}  |  {when}",
+  "@procurementPdfPrintedBy": {
+    "placeholders": {
+      "name": {"type": "String"},
+      "when": {"type": "String"}
+    }
+  },
+  "procurementPdfFilters": "Filters: {summary}",
+  "@procurementPdfFilters": {
+    "placeholders": {
+      "summary": {"type": "String"}
+    }
+  },
+  "procurementPdfTotals": "Totals",
+  "procurementPdfNoProductsForProject": "No products for this project.",
+  "procurementPdfPage": "Page {page} / {total}",
+  "@procurementPdfPage": {
+    "placeholders": {
+      "page": {"type": "int"},
+      "total": {"type": "int"}
+    }
+  },
   "reportExportProjectPdf": "Export PDF",
   "projectSavedShort": "Project saved",
   "quantityRest": "Rest",
@@ -122,6 +255,10 @@
   "refuseDistribution": "Refuse Distribution",
   "validateDistribution": "Validate Distribution",
   "approve": "Approve",
+  "sendToAdmin": "Send to Admin",
+  "sendToManager": "Send to Manager",
+  "editOrder": "Edit order",
+  "orderUpdated": "Order updated",
   "validate": "Validate",
   "refuse": "Refuse",
 
@@ -233,7 +370,7 @@
       "unit": {"type": "String"}
     }
   },
-  "orderQtySupplementaryBreakdown": "{remaining} remaining + {supplementary} supplementary → total {total} {unit}",
+  "orderQtySupplementaryBreakdown": "{remaining} {unit} + {supplementary} Supplementary",
   "@orderQtySupplementaryBreakdown": {
     "placeholders": {
       "remaining": {"type": "int"},
@@ -261,7 +398,7 @@
       "name": {"type": "String"}
     }
   },
-  "approvedQuantities": "Approved quantities (by admin):",
+  "approvedQuantities": "Approved quantities (by manager):",
   "noProductsLabel": "No products",
   "myOrders": "My Orders",
   "newOrder": "New Order",
@@ -323,6 +460,23 @@
   "roleUser": "User",
   "roleAdmin": "Admin",
   "roleWarehouse": "Warehouse User",
+  "roleManager": "Manager",
+  "roleSupervisor": "Supervisor",
+  "roleFinance": "Finance",
+  "passwordOptional": "Password (optional)",
+  "printFullProjectPdf": "Print full project PDF",
+  "printCreationDate": "Print creation date",
+  "printProjectUpdateNumber": "Print project update #{index}",
+  "@printProjectUpdateNumber": {
+    "placeholders": {
+      "index": {"type": "int"}
+    }
+  },
+  "printAllModifications": "Print all modifications",
+  "printAllModificationsSubtitle": "Project history with all changes",
+  "orderResubmitted": "Order resubmitted",
+  "resubmitToSupervisor": "Resubmit to Supervisor",
+  "couldNotReadImage": "Could not read image data. Try another file.",
   "none": "-- None --",
   "description": "Description",
   "owner": "Owner",
@@ -423,6 +577,9 @@
   "qtyLabel": "Qty:",
   "requested": "Requested",
   "requestedBoq": "Requested (BOQ)",
+  "requestedQuantityLabel": "Requested Quantity",
+  "qtyAddedByAdminLabel": "Quantity Added by Admin",
+  "remainingRequestedLabel": "Remaining Requested Quantity",
   "projectQuantitiesNotStockHint": "BOQ / project quantities — not warehouse stock.",
   "distributed": "Distributed",
   "stockRecordDeleted": "Stock record deleted",
@@ -492,6 +649,7 @@
   "editStore": "Edit Store",
 
   "appTitle": "Stock Management",
+  "brandName": "Egypt Grid",
   "noItemsMatchSearch": "No items match your search.",
   "materialRequestLabel": "Material Request:",
   "andMore": "... and more",
@@ -526,6 +684,47 @@
   "stockChange": "Stock change",
   "reportDateByUser": "Report date by user:",
   "orderDateRequired": "Order date *",
+  "expectedArrivalDaysRequired": "Arrive at user within *",
+  "arrivalWithinDays": "{days} day(s)",
+  "@arrivalWithinDays": {
+    "placeholders": {
+      "days": {"type": "int"}
+    }
+  },
+  "expectedArrivalColumn": "Arrive in: {days} day(s)",
+  "@expectedArrivalColumn": {
+    "placeholders": {
+      "days": {"type": "int"}
+    }
+  },
+  "expectedArrivalDateValue": "Expected arrival: {date}",
+  "@expectedArrivalDateValue": {
+    "placeholders": {
+      "date": {"type": "String"}
+    }
+  },
+  "orderDistributionDateValue": "Distribution date: {date}",
+  "@orderDistributionDateValue": {
+    "placeholders": {
+      "date": {"type": "String"}
+    }
+  },
+  "orderArrivalDateValue": "Arrival date: {date}",
+  "@orderArrivalDateValue": {
+    "placeholders": {
+      "date": {"type": "String"}
+    }
+  },
+  "orderLateByDays": "Order is late by {days} day(s)",
+  "@orderLateByDays": {
+    "placeholders": {
+      "days": {"type": "int"}
+    }
+  },
+  "confirmOrderArrived": "Confirm order arrived",
+  "orderArrivedSuccess": "Order arrived successfully",
+  "orderArrivedConfirmed": "Arrival confirmation sent",
+  "orderArrivedNotification": "Order arrived successfully",
   "noItemsFound": "No {type} found.",
   "@noItemsFound": {
     "placeholders": {
@@ -604,7 +803,7 @@
     }
   },
   "noApprovedOrdersToDistribute": "No approved orders to distribute",
-  "whenAdminApprovesOrderHint": "When admin approves an order, it will appear here with quantities.\nUse + to create a distribution manually.",
+  "whenAdminApprovesOrderHint": "When the manager approves an order, it will appear here with quantities.\nUse + to create a distribution manually.",
   "orderNumberPrefix": "Order #{prefix}...",
   "@orderNumberPrefix": {
     "placeholders": {
@@ -736,5 +935,32 @@
     "placeholders": {
       "max": {"type": "String"}
     }
-  }
+  },
+  "insufficientStockReplacePrompt": "Insufficient stock. Would you like to replace this product with one or more products?",
+  "outOfStock": "Out of Stock",
+  "replaceProduct": "Replace Product",
+  "productReplacedSuccessfully": "Product Replaced Successfully",
+  "selectReplacementProduct": "Select replacement product(s)",
+  "noProductsWithStock": "No products with available stock.",
+  "originalProduct": "Original Product",
+  "replacedByProduct": "Replaced By",
+  "replacementDate": "Replacement Date",
+  "replacedByAdmin": "Replaced By",
+  "skuLabel": "SKU",
+  "availableQuantityLabel": "Available Quantity",
+  "replacementAssignedQty": "Assigned: {assigned} / {required}",
+  "@replacementAssignedQty": {
+    "placeholders": {
+      "assigned": {"type": "String"},
+      "required": {"type": "String"}
+    }
+  },
+  "confirmReplacements": "Confirm replacements",
+  "replacementQtyMustMatch": "Total replacement quantity must equal {required}.",
+  "@replacementQtyMustMatch": {
+    "placeholders": {
+      "required": {"type": "String"}
+    }
+  },
+  "changeReplacement": "Change replacement"
 }

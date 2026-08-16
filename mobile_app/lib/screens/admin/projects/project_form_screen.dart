@@ -2,13 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import '../../../l10n/app_localizations.dart';
 import '../../../models/product.dart';
-import '../../../models/store.dart';
 import '../../../models/user.dart' show Project;
 import '../../../services/api_service.dart';
 import '../../../theme/app_theme.dart';
 import '../../../utils/l10n_formatters.dart';
 import '../../../utils/product_localized.dart';
-import '../../../utils/store_localized.dart';
 
 DateTime? _parseLocalYmd(String? s) {
   if (s == null || s.trim().isEmpty) return null;
@@ -50,10 +48,6 @@ class _ProjectFormScreenState extends State<ProjectFormScreen> {
   bool _loading = false;
   String? _error;
   List<Product> _allProducts = [];
-  /// Stores + depots (merged) for default stock source on this project.
-  List<Store> _stockSources = [];
-  /// Default store or depot id for warehouse distributions (optional).
-  String? _depotId;
   final Map<String, num> _stockByProduct = {};
   final List<Map<String, dynamic>> _selectedProducts = [];
 
@@ -70,15 +64,15 @@ class _ProjectFormScreenState extends State<ProjectFormScreen> {
     _descriptionController.text = p.description ?? '';
     _status = p.status.isNotEmpty ? p.status : 'active';
     _boqCreationDate = _parseLocalYmd(p.boqCreationDate) ?? DateTime.now();
-    final d = p.depotId?.trim();
-    _depotId = (d != null && d.isNotEmpty) ? d : null;
     _selectedProducts.clear();
     // Toutes les lignes (y compris quantité 0) pour ne rien « supprimer » du formulaire.
     for (final pp in p.products ?? []) {
       _selectedProducts.add({
         'productId': pp.product,
         'name': pp.productName ?? pp.product,
-        'quantity': pp.allowedQuantity,
+        'quantity': 0, // quantity to add on next save (additive)
+        'remaining': pp.allowedQuantity,
+        'requested': pp.requestedQuantity,
         'color': pp.color,
         'boqDate': pp.boqDate,
         'manufacturer': null,
@@ -114,35 +108,7 @@ class _ProjectFormScreenState extends State<ProjectFormScreen> {
       _reloadProjectDetail();
     }
     _loadProducts();
-    _loadStockSources();
     _loadStockTotals();
-  }
-
-  Future<void> _loadStockSources() async {
-    try {
-      final results = await Future.wait([
-        _apiService.get('/stores'),
-        _apiService.get('/depots'),
-      ]);
-      if (!mounted) return;
-      final merged = <Store>[];
-      final seen = <String>{};
-      void addList(dynamic data) {
-        if (data is! List) return;
-        for (final e in data) {
-          final s = Store.fromJson(Map<String, dynamic>.from(e as Map));
-          if (s.id.isEmpty) continue;
-          if (seen.add(s.id)) merged.add(s);
-        }
-      }
-
-      final storesRes = results[0];
-      final depotsRes = results[1];
-      if (storesRes['success'] == true) addList(storesRes['data']);
-      if (depotsRes['success'] == true) addList(depotsRes['data']);
-      merged.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-      setState(() => _stockSources = merged);
-    } catch (_) {}
   }
 
   @override
@@ -157,7 +123,13 @@ class _ProjectFormScreenState extends State<ProjectFormScreen> {
 
   List<Map<String, dynamic>> _getProjectProductsPayload() {
     return _selectedProducts.map((p) {
-      final map = {'product': p['productId'], 'allowedQuantity': p['quantity'] as int};
+      final addQty = p['quantity'] as int? ?? 0;
+      final map = <String, dynamic>{
+        'product': p['productId'],
+        'quantityToAdd': addQty,
+        // Keep for older API readers; not used as absolute set when quantityToAdd is sent.
+        'allowedQuantity': addQty,
+      };
       final color = p['color'] as String?;
       if (color != null && color.isNotEmpty) map['color'] = color;
       final boq = p['boqDate'] as String?;
@@ -353,6 +325,8 @@ class _ProjectFormScreenState extends State<ProjectFormScreen> {
                         'productId': pid,
                         'name': prod.name,
                         'quantity': q,
+                        'remaining': 0,
+                        'requested': 0,
                         'color': null,
                         'boqDate': null,
                         'manufacturer': prod.manufacturer,
@@ -367,6 +341,8 @@ class _ProjectFormScreenState extends State<ProjectFormScreen> {
                           'productId': pid,
                           'name': '${prod.name} ($v)',
                           'quantity': q,
+                          'remaining': 0,
+                          'requested': 0,
                           'color': v,
                           'boqDate': null,
                           'manufacturer': prod.manufacturer,
@@ -398,19 +374,32 @@ class _ProjectFormScreenState extends State<ProjectFormScreen> {
 
   void _editProductQuantity(int index) {
     final item = _selectedProducts[index];
-    final qtyController = TextEditingController(text: (item['quantity'] as int).toString());
+    final qtyController = TextEditingController(text: '0');
     final l10n = AppLocalizations.of(context)!;
+    final remaining = item['remaining'] as int? ?? 0;
+    final requested = item['requested'] as int? ?? 0;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(l10n.editItem(localizedApiProductName(context, item['name']?.toString() ?? ''))),
-        content: TextField(
-          controller: qtyController,
-          keyboardType: TextInputType.number,
-          decoration: InputDecoration(
-            labelText: l10n.maxQty,
-            border: const OutlineInputBorder(),
-          ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('${l10n.requestedQuantityLabel}: $requested', style: AppTheme.appTextStyle(context, color: AppTheme.textSecondary)),
+            const SizedBox(height: 4),
+            Text('${l10n.remainingRequestedLabel}: $remaining', style: AppTheme.appTextStyle(context, color: AppTheme.textSecondary)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: qtyController,
+              keyboardType: TextInputType.number,
+              autofocus: true,
+              decoration: InputDecoration(
+                labelText: l10n.quantityToAdd,
+                border: const OutlineInputBorder(),
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: Text(l10n.cancel)),
@@ -420,8 +409,6 @@ class _ProjectFormScreenState extends State<ProjectFormScreen> {
               Navigator.pop(ctx);
               if (quantity > 0) {
                 setState(() => _selectedProducts[index]['quantity'] = quantity);
-              } else {
-                setState(() => _selectedProducts.removeAt(index));
               }
             },
             child: Text(l10n.save),
@@ -452,7 +439,7 @@ class _ProjectFormScreenState extends State<ProjectFormScreen> {
     for (final row in _selectedProducts) {
       final productId = row['productId'] as String?;
       if (productId == null || productId.isEmpty) continue;
-      final requested = (row['quantity'] as int?) ?? 0;
+      final requested = ((row['requested'] as int?) ?? 0) + ((row['quantity'] as int?) ?? 0);
       if (requested <= 0) continue;
       final available = _availableStockForProduct(productId);
       if (requested > available) {
@@ -510,8 +497,6 @@ class _ProjectFormScreenState extends State<ProjectFormScreen> {
         'projectOwner': _projectOwnerController.text.trim().isEmpty ? null : _projectOwnerController.text.trim(),
         'projectOwnerAr': _projectOwnerArController.text.trim().isEmpty ? null : _projectOwnerArController.text.trim(),
         if (_isEdit) 'status': _status,
-        if (_isEdit) 'depotId': _depotId,
-        if (!_isEdit && _depotId != null && _depotId!.trim().isNotEmpty) 'depotId': _depotId!.trim(),
       };
       if (_isEdit) {
         final res = await _apiService.put('/projects/${widget.project!.id}', data);
@@ -635,41 +620,6 @@ class _ProjectFormScreenState extends State<ProjectFormScreen> {
                   border: const OutlineInputBorder(),
                 ),
               ),
-              const SizedBox(height: AppTheme.spaceMd),
-              Builder(
-                builder: (context) {
-                  final orphanDepot = _depotId != null &&
-                      _depotId!.isNotEmpty &&
-                      !_stockSources.any((d) => d.id == _depotId);
-                  return DropdownButtonFormField<String?>(
-                    value: _depotId,
-                    isExpanded: true,
-                    decoration: InputDecoration(
-                      labelText: l10n.projectDepotOptional,
-                      border: const OutlineInputBorder(),
-                      helperText: l10n.projectDepotHelper,
-                    ),
-                    items: [
-                      DropdownMenuItem<String?>(
-                        value: null,
-                        child: Text(l10n.none, overflow: TextOverflow.ellipsis),
-                      ),
-                      if (orphanDepot)
-                        DropdownMenuItem<String?>(
-                          value: _depotId,
-                          child: Text(_depotId!, overflow: TextOverflow.ellipsis),
-                        ),
-                      ..._stockSources.map(
-                        (d) => DropdownMenuItem<String?>(
-                          value: d.id,
-                          child: Text(d.displayName(context), overflow: TextOverflow.ellipsis, maxLines: 2),
-                        ),
-                      ),
-                    ],
-                    onChanged: (v) => setState(() => _depotId = v),
-                  );
-                },
-              ),
               const SizedBox(height: AppTheme.spaceLg),
               Row(
                 children: [
@@ -737,9 +687,19 @@ class _ProjectFormScreenState extends State<ProjectFormScreen> {
                                   ],
                                   const SizedBox(height: 4),
                                   Text(
-                                    '${l10n.maxQty} ${e.value['quantity']}${(e.value['color'] as String?) != null ? ' • ${localizedVariantOrColorLabel(context, e.value['color'] as String)}' : ''}',
+                                    '${l10n.requestedQuantityLabel}: ${e.value['requested'] ?? 0}'
+                                    '${(e.value['color'] as String?) != null ? ' • ${localizedVariantOrColorLabel(context, e.value['color'] as String)}' : ''}',
                                     style: AppTheme.appTextStyle(context, fontSize: 13, color: AppTheme.textSecondary),
                                   ),
+                                  Text(
+                                    '${l10n.remainingRequestedLabel}: ${e.value['remaining'] ?? 0}',
+                                    style: AppTheme.appTextStyle(context, fontSize: 13, color: AppTheme.textSecondary),
+                                  ),
+                                  if (((e.value['quantity'] as int?) ?? 0) > 0)
+                                    Text(
+                                      '${l10n.qtyAddedByAdminLabel}: ${e.value['quantity']}',
+                                      style: AppTheme.appTextStyle(context, fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.primary),
+                                    ),
                                 ],
                               ),
                             ),
@@ -843,14 +803,29 @@ class _SearchableProductSelectState extends State<_SearchableProductSelect> {
       final category = p.category.join(' ').toLowerCase();
       final displayCat = p.displayCategories(context).toLowerCase();
       final mfr = (p.manufacturer ?? '').toLowerCase();
+      final variants = p.availableColors.join(' ').toLowerCase();
+      final variantsLocalized = p.availableColors
+          .map((c) => localizedVariantOrColorLabel(context, c).toLowerCase())
+          .join(' ');
       return name.contains(q) ||
           displayAr.contains(q) ||
           displayEn.contains(q) ||
           unit.contains(q) ||
           category.contains(q) ||
           displayCat.contains(q) ||
-          mfr.contains(q);
+          mfr.contains(q) ||
+          variants.contains(q) ||
+          variantsLocalized.contains(q);
     }).toList();
+  }
+
+  String? _variantsSubtitle(BuildContext context, Product p) {
+    if (p.availableColors.isEmpty) return null;
+    final l10n = AppLocalizations.of(context)!;
+    final labels = p.availableColors
+        .map((c) => localizedVariantOrColorLabel(context, c))
+        .join(', ');
+    return '${l10n.variant}: $labels';
   }
 
   void _showSearchDialog() {
@@ -900,6 +875,11 @@ class _SearchableProductSelectState extends State<_SearchableProductSelect> {
                             final p = filtered[i];
                             final selected = p.id == widget.value;
                             final m = p.manufacturer?.trim();
+                            final variantsLine = _variantsSubtitle(ctx, p);
+                            final subtitleLines = <String>[
+                              if (m != null && m.isNotEmpty) '${AppLocalizations.of(context)!.manufacturer}: $m',
+                              if (variantsLine != null) variantsLine,
+                            ];
                             return ListTile(
                               title: Text(
                                 widget.displayText(p),
@@ -907,14 +887,13 @@ class _SearchableProductSelectState extends State<_SearchableProductSelect> {
                                 maxLines: null,
                                 overflow: TextOverflow.clip,
                               ),
-                              subtitle: m != null && m.isNotEmpty
-                                  ? Text(
-                                      '${AppLocalizations.of(context)!.manufacturer}: $m',
+                              subtitle: subtitleLines.isEmpty
+                                  ? null
+                                  : Text(
+                                      subtitleLines.join('\n'),
                                       style: AppTheme.appTextStyle(context, fontSize: 13, color: AppTheme.textSecondary),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    )
-                                  : null,
+                                    ),
+                              isThreeLine: subtitleLines.length > 1,
                               trailing: selected ? const Icon(Icons.check, color: AppTheme.primary) : null,
                               onTap: () {
                                 widget.onChanged(p.id);
@@ -944,6 +923,7 @@ class _SearchableProductSelectState extends State<_SearchableProductSelect> {
     final display = product != null ? widget.displayText(product) : AppLocalizations.of(context)!.selectProduct;
     final l10n = AppLocalizations.of(context)!;
     final mClosed = product?.manufacturer?.trim();
+    final variantsClosed = product != null ? _variantsSubtitle(context, product) : null;
     return InkWell(
       onTap: _showSearchDialog,
       borderRadius: BorderRadius.circular(4),
@@ -980,6 +960,14 @@ class _SearchableProductSelectState extends State<_SearchableProductSelect> {
                       style: AppTheme.appTextStyle(context, fontSize: 13, color: AppTheme.textSecondary),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                  if (variantsClosed != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      variantsClosed,
+                      style: AppTheme.appTextStyle(context, fontSize: 13, color: AppTheme.textSecondary),
+                      softWrap: true,
                     ),
                   ],
                 ],

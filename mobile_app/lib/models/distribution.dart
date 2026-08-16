@@ -96,20 +96,55 @@ class DistributionUser {
 class DistributionProduct {
   final String product;
   final String? productName;
+  final String? unit;
   final int quantity;
   final String? color;
+  final bool isReplaced;
+  final String? originalProductId;
+  final String? originalProductName;
+  final String? replacementProductId;
+  final String? replacementProductName;
+  final String? replacedAt;
+  final DistributionUser? replacedBy;
 
-  DistributionProduct({required this.product, this.productName, required this.quantity, this.color});
+  DistributionProduct({
+    required this.product,
+    this.productName,
+    this.unit,
+    required this.quantity,
+    this.color,
+    this.isReplaced = false,
+    this.originalProductId,
+    this.originalProductName,
+    this.replacementProductId,
+    this.replacementProductName,
+    this.replacedAt,
+    this.replacedBy,
+  });
 
   factory DistributionProduct.fromJson(Map<String, dynamic> json) {
     final p = json['product'];
     final productId = p is Map ? (p['id'] ?? p['_id'] ?? '').toString() : p?.toString() ?? '';
     final productName = p is Map ? (p['name'] as String?) : null;
+    final unit = p is Map ? p['unit']?.toString() : null;
+    final original = json['originalProduct'] ?? json['original_product'];
+    final replacement = json['replacementProduct'] ?? json['replacement_product'];
+    final replacedByRaw = json['replacedBy'] ?? json['replaced_by'];
     return DistributionProduct(
       product: productId,
       productName: productName,
+      unit: unit,
       quantity: json['quantity'] ?? 0,
       color: json['color']?.toString(),
+      isReplaced: json['isReplaced'] == true || json['is_replaced'] == true,
+      originalProductId: (json['originalProductId'] ?? json['original_product_id'] ?? (original is Map ? original['id'] : null))?.toString(),
+      originalProductName: original is Map ? original['name']?.toString() : null,
+      replacementProductId: (json['replacementProductId'] ?? json['replacement_product_id'] ?? (replacement is Map ? replacement['id'] : null))?.toString(),
+      replacementProductName: replacement is Map ? replacement['name']?.toString() : null,
+      replacedAt: (json['replacedAt'] ?? json['replaced_at'])?.toString(),
+      replacedBy: replacedByRaw is Map
+          ? DistributionUser.fromJson(Map<String, dynamic>.from(replacedByRaw))
+          : null,
     );
   }
 }

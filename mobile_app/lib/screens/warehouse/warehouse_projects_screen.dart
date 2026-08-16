@@ -47,7 +47,7 @@ class _WarehouseProjectsScreenState extends State<WarehouseProjectsScreen> with 
       _error = null;
     });
     try {
-      final res = await _apiService.get('/projects');
+      final res = await _apiService.get('/projects', queryParams: {'light': 'true'});
       if (res['success'] == true && res['data'] != null) {
         setState(() {
           _projects = (res['data'] as List)
@@ -181,7 +181,8 @@ class _WarehouseProjectsScreenState extends State<WarehouseProjectsScreen> with 
                                     runSpacing: 6,
                                     crossAxisAlignment: WrapCrossAlignment.center,
                                     children: [
-                                      _buildQuantityChip(l10n.requestedBoq, requested, Colors.blue),
+                                      _buildQuantityChip(l10n.requestedQuantityLabel, requested, Colors.blue),
+                                      _buildQuantityChip(l10n.remainingRequestedLabel, p.allowedQuantity, Colors.blueGrey),
                                       _buildQuantityChip(l10n.distributed, distQty, Colors.green),
                                     ],
                                   ),

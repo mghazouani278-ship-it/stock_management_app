@@ -27,6 +27,7 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
   final Map<String, TextEditingController> _quantityControllers = {};
   final _notesController = TextEditingController();
   DateTime _orderDate = DateTime.now();
+  int _expectedArrivalDays = 3;
   bool _loading = true;
   bool _submitting = false;
   String? _error;
@@ -94,18 +95,18 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
     return int.tryParse(v.toString()) ?? 0;
   }
 
-  /// Remaining project quantity allocable to new orders for this line.
-  /// Prefer requested - distributed when available (more reliable than stale allowedQuantity).
+  /// Remaining requested quantity still allocatable to new orders (admin ADD − orders).
   int _remainingAllocatedFor(Map<String, dynamic> p) {
-    final allowed = _parseQuantity(p['allowedQuantity'] ?? p['allowed_quantity']);
+    final remaining = _parseQuantity(
+      p['remainingQuantity'] ?? p['remaining_quantity'] ?? p['allowedQuantity'] ?? p['allowed_quantity'],
+    );
+    return remaining < 0 ? 0 : remaining;
+  }
+
+  int _requestedTotalFor(Map<String, dynamic> p) {
     final requested = _parseQuantity(p['requestedQuantity'] ?? p['requested_quantity']);
-    final distributed = _parseQuantity(p['distributedQuantity'] ?? p['distributed_quantity']);
-    if (requested > 0) {
-      final rem = requested - distributed;
-      if (rem <= 0) return 0;
-      return rem > requested ? requested : rem;
-    }
-    return allowed < 0 ? 0 : allowed;
+    if (requested > 0) return requested;
+    return _remainingAllocatedFor(p);
   }
 
   Future<void> _showAddProductDialog() async {
@@ -137,6 +138,7 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
             orElse: () => available.first,
           );
           final allowed = _remainingAllocatedFor(selected);
+          final requestedTotal = _requestedTotalFor(selected);
           final unit = selected['product']?['unit'] ?? '';
           return AlertDialog(
             title: Text(l10n.addProductSmall),
@@ -185,7 +187,11 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    l10n.allocatedWithUnit('$allowed', formatRawUnitForDisplay(unit.toString())),
+                    '${l10n.requestedQuantityLabel}: $requestedTotal ${formatRawUnitForDisplay(unit.toString())}',
+                    style: AppTheme.appTextStyle(context, fontSize: 13, color: AppTheme.textSecondary),
+                  ),
+                  Text(
+                    '${l10n.remainingRequestedLabel}: $allowed ${formatRawUnitForDisplay(unit.toString())}',
                     style: AppTheme.appTextStyle(context, fontSize: 13, fontWeight: FontWeight.w500, color: allowed > 0 ? AppTheme.primary : AppTheme.warning),
                   ),
                   Text(
@@ -295,9 +301,10 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
       final body = <String, dynamic>{
         'products': products,
         'orderDate': _orderDate.toIso8601String().split('T')[0],
+        'expectedArrivalDays': _expectedArrivalDays,
         'notes': _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
       };
-      if (authProvider.isAdmin && effectiveProjectId != null && effectiveProjectId.isNotEmpty) {
+      if (effectiveProjectId != null && effectiveProjectId.isNotEmpty) {
         body['projectId'] = effectiveProjectId;
       }
       await _apiService.post('/orders', body);
@@ -385,6 +392,24 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
                 L10nFormatters.formatDateShort(context, _orderDate),
               ),
             ),
+          ),
+          const SizedBox(height: AppTheme.spaceMd),
+          DropdownButtonFormField<int>(
+            value: _expectedArrivalDays,
+            decoration: InputDecoration(
+              labelText: AppLocalizations.of(context)!.expectedArrivalDaysRequired,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppTheme.radiusMd)),
+            ),
+            items: List.generate(7, (i) {
+              final days = i + 1;
+              return DropdownMenuItem(
+                value: days,
+                child: Text(AppLocalizations.of(context)!.arrivalWithinDays(days)),
+              );
+            }),
+            onChanged: (v) {
+              if (v != null) setState(() => _expectedArrivalDays = v);
+            },
           ),
           const SizedBox(height: AppTheme.spaceMd),
           Row(

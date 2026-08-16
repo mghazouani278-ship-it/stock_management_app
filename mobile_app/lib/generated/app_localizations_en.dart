@@ -89,10 +89,55 @@ class AppLocalizationsEn extends AppLocalizations {
   String get searchReportHint => 'Search report...';
 
   @override
-  String get reportValidatedDistributions => 'Validated Distributions';
+  String get reportValidatedDistributions => 'Taking Delivery';
 
   @override
-  String get reportValidatedDistributionsMenu => 'Validated\nDistributions';
+  String get reportValidatedDistributionsMenu => 'Taking\nDelivery';
+
+  @override
+  String get reportTakingDelivery => 'Taking Delivery';
+
+  @override
+  String get takingDeliveryProjectCreated => 'Project creation date';
+
+  @override
+  String get takingDeliveryProjectOwner => 'Project owner';
+
+  @override
+  String get takingDeliveryQtyDistributed => 'Qty distributed';
+
+  @override
+  String get takingDeliveryQtyRemaining => 'Qty remaining';
+
+  @override
+  String get takingDeliveryReplacements => 'Product replacements';
+
+  @override
+  String get takingDeliveryTimeline => 'Order timeline';
+
+  @override
+  String get takingDeliveryUserOrderDate => 'User order date';
+
+  @override
+  String get takingDeliverySupervisorToAdmin => 'Supervisor sent to admin';
+
+  @override
+  String get takingDeliveryAdminToManager => 'Admin sent to manager';
+
+  @override
+  String get takingDeliveryManagerApproved => 'Manager approved';
+
+  @override
+  String get takingDeliveryWarehouseDistributed =>
+      'Warehouse distribution date';
+
+  @override
+  String get takingDeliveryArrivedAtUser => 'Arrival at user';
+
+  @override
+  String takingDeliveryArrivalAt(String name) {
+    return 'Arrival at $name';
+  }
 
   @override
   String get reportApprovedReturns => 'Approved Returns';
@@ -111,6 +156,196 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get reportProjectsMenu => 'Projects';
+
+  @override
+  String get procurementPlanning => 'Procurement Planning';
+
+  @override
+  String get procurementPlanningMenu => 'Procurement\nPlanning';
+
+  @override
+  String get procurementColRequiredPerProject => 'Required Qty / Project';
+
+  @override
+  String get procurementColTotalRequired => 'Total Required Qty';
+
+  @override
+  String get procurementColRemaining => 'Remaining to Supply';
+
+  @override
+  String get procurementColWarehouseStock => 'Warehouse Stock';
+
+  @override
+  String get procurementColQtyToPurchase => 'Quantity to Purchase';
+
+  @override
+  String get procurementColTotalRequiredShort => 'Total Required';
+
+  @override
+  String get procurementColRemainingShort => 'Remaining';
+
+  @override
+  String get procurementColWhStockShort => 'WH Stock';
+
+  @override
+  String get procurementColToPurchaseShort => 'To Purchase';
+
+  @override
+  String get procurementSearchHint => 'Search name / SKU / category';
+
+  @override
+  String get procurementAllStatuses => 'All statuses';
+
+  @override
+  String get procurementStatusInStock => 'In Stock';
+
+  @override
+  String get procurementStatusPartial => 'Partially Available';
+
+  @override
+  String get procurementStatusPurchaseRequired => 'Purchase Required';
+
+  @override
+  String get procurementAllWarehouses => 'All warehouses';
+
+  @override
+  String get procurementAllProjects => 'All projects';
+
+  @override
+  String procurementProjectsCount(int count) {
+    return '$count projects';
+  }
+
+  @override
+  String get procurementApply => 'Apply';
+
+  @override
+  String get procurementRefresh => 'Refresh';
+
+  @override
+  String get procurementPrintPdf => 'Print PDF';
+
+  @override
+  String procurementLastCalculated(String when, int count) {
+    return 'Last calculated: $when  •  $count products';
+  }
+
+  @override
+  String procurementSelectedCount(int count) {
+    return '$count selected';
+  }
+
+  @override
+  String get procurementSwipeHint =>
+      'Swipe sideways to see all columns, or use card view below.';
+
+  @override
+  String get procurementFullTable => 'Full table (swipe horizontally)';
+
+  @override
+  String get procurementAllProducts => 'All products';
+
+  @override
+  String procurementCurrentPageCount(int count) {
+    return 'Current page ($count)';
+  }
+
+  @override
+  String get procurementSelectedProducts => 'Selected products';
+
+  @override
+  String get procurementSelectRowsFirst => 'Select rows with checkboxes first';
+
+  @override
+  String get procurementByProject => 'By project';
+
+  @override
+  String get procurementChooseOneProject => 'Choose one project';
+
+  @override
+  String get procurementExportExcel => 'Export Excel (CSV)';
+
+  @override
+  String get procurementNoProjects => 'No projects available';
+
+  @override
+  String get procurementPrintByProject => 'Print by project';
+
+  @override
+  String get procurementNoRowsToPrint => 'No rows to print';
+
+  @override
+  String get procurementExcelCopied =>
+      'Excel/CSV copied to clipboard — paste into Excel';
+
+  @override
+  String get procurementFilterProjects => 'Filter projects';
+
+  @override
+  String get procurementClear => 'Clear';
+
+  @override
+  String get procurementNoData => 'No data for the selected filters';
+
+  @override
+  String get procurementLoadFailed => 'Failed to load Procurement Planning';
+
+  @override
+  String procurementPageOf(int page, int total) {
+    return 'Page $page / $total';
+  }
+
+  @override
+  String get procurementTotalsProducts => 'Products';
+
+  @override
+  String get procurementTotalsTotalRequired => 'Total Required';
+
+  @override
+  String get procurementTotalsRemaining => 'Remaining';
+
+  @override
+  String get procurementTotalsWarehouseStock => 'Warehouse Stock';
+
+  @override
+  String get procurementTotalsToPurchase => 'To Purchase';
+
+  @override
+  String procurementPdfSelectedSubtitle(int count) {
+    return 'Selected products ($count)';
+  }
+
+  @override
+  String procurementPdfAllSubtitle(int count) {
+    return 'All products ($count)';
+  }
+
+  @override
+  String procurementPdfByProject(String name) {
+    return 'By project: $name';
+  }
+
+  @override
+  String procurementPdfPrintedBy(String name, String when) {
+    return 'Printed by: $name  |  $when';
+  }
+
+  @override
+  String procurementPdfFilters(String summary) {
+    return 'Filters: $summary';
+  }
+
+  @override
+  String get procurementPdfTotals => 'Totals';
+
+  @override
+  String get procurementPdfNoProductsForProject =>
+      'No products for this project.';
+
+  @override
+  String procurementPdfPage(int page, int total) {
+    return 'Page $page / $total';
+  }
 
   @override
   String get reportExportProjectPdf => 'Export PDF';
@@ -302,6 +537,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get approve => 'Approve';
+
+  @override
+  String get sendToAdmin => 'Send to Admin';
+
+  @override
+  String get sendToManager => 'Send to Manager';
+
+  @override
+  String get editOrder => 'Edit order';
+
+  @override
+  String get orderUpdated => 'Order updated';
 
   @override
   String get validate => 'Validate';
@@ -530,7 +777,7 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String orderQtySupplementaryBreakdown(
       int remaining, int supplementary, int total, String unit) {
-    return '$remaining remaining + $supplementary supplementary → total $total $unit';
+    return '$remaining $unit + $supplementary Supplementary';
   }
 
   @override
@@ -552,7 +799,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get approvedQuantities => 'Approved quantities (by admin):';
+  String get approvedQuantities => 'Approved quantities (by manager):';
 
   @override
   String get noProductsLabel => 'No products';
@@ -701,6 +948,46 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get roleWarehouse => 'Warehouse User';
+
+  @override
+  String get roleManager => 'Manager';
+
+  @override
+  String get roleSupervisor => 'Supervisor';
+
+  @override
+  String get roleFinance => 'Finance';
+
+  @override
+  String get passwordOptional => 'Password (optional)';
+
+  @override
+  String get printFullProjectPdf => 'Print full project PDF';
+
+  @override
+  String get printCreationDate => 'Print creation date';
+
+  @override
+  String printProjectUpdateNumber(int index) {
+    return 'Print project update #$index';
+  }
+
+  @override
+  String get printAllModifications => 'Print all modifications';
+
+  @override
+  String get printAllModificationsSubtitle =>
+      'Project history with all changes';
+
+  @override
+  String get orderResubmitted => 'Order resubmitted';
+
+  @override
+  String get resubmitToSupervisor => 'Resubmit to Supervisor';
+
+  @override
+  String get couldNotReadImage =>
+      'Could not read image data. Try another file.';
 
   @override
   String get none => '-- None --';
@@ -896,6 +1183,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get requestedBoq => 'Requested (BOQ)';
 
   @override
+  String get requestedQuantityLabel => 'Requested Quantity';
+
+  @override
+  String get qtyAddedByAdminLabel => 'Quantity Added by Admin';
+
+  @override
+  String get remainingRequestedLabel => 'Remaining Requested Quantity';
+
+  @override
   String get projectQuantitiesNotStockHint =>
       'BOQ / project quantities — not warehouse stock.';
 
@@ -1040,6 +1336,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get appTitle => 'Stock Management';
 
   @override
+  String get brandName => 'Egypt Grid';
+
+  @override
   String get noItemsMatchSearch => 'No items match your search.';
 
   @override
@@ -1148,6 +1447,51 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get orderDateRequired => 'Order date *';
+
+  @override
+  String get expectedArrivalDaysRequired => 'Arrive at user within *';
+
+  @override
+  String arrivalWithinDays(int days) {
+    return '$days day(s)';
+  }
+
+  @override
+  String expectedArrivalColumn(int days) {
+    return 'Arrive in: $days day(s)';
+  }
+
+  @override
+  String expectedArrivalDateValue(String date) {
+    return 'Expected arrival: $date';
+  }
+
+  @override
+  String orderDistributionDateValue(String date) {
+    return 'Distribution date: $date';
+  }
+
+  @override
+  String orderArrivalDateValue(String date) {
+    return 'Arrival date: $date';
+  }
+
+  @override
+  String orderLateByDays(int days) {
+    return 'Order is late by $days day(s)';
+  }
+
+  @override
+  String get confirmOrderArrived => 'Confirm order arrived';
+
+  @override
+  String get orderArrivedSuccess => 'Order arrived successfully';
+
+  @override
+  String get orderArrivedConfirmed => 'Arrival confirmation sent';
+
+  @override
+  String get orderArrivedNotification => 'Order arrived successfully';
 
   @override
   String noItemsFound(String type) {
@@ -1261,7 +1605,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get whenAdminApprovesOrderHint =>
-      'When admin approves an order, it will appear here with quantities.\nUse + to create a distribution manually.';
+      'When the manager approves an order, it will appear here with quantities.\nUse + to create a distribution manually.';
 
   @override
   String orderNumberPrefix(String prefix) {
@@ -1483,4 +1827,57 @@ class AppLocalizationsEn extends AppLocalizations {
   String maxQtyHintNumber(String max) {
     return 'Max: $max';
   }
+
+  @override
+  String get insufficientStockReplacePrompt =>
+      'Insufficient stock. Would you like to replace this product with one or more products?';
+
+  @override
+  String get outOfStock => 'Out of Stock';
+
+  @override
+  String get replaceProduct => 'Replace Product';
+
+  @override
+  String get productReplacedSuccessfully => 'Product Replaced Successfully';
+
+  @override
+  String get selectReplacementProduct => 'Select replacement product(s)';
+
+  @override
+  String get noProductsWithStock => 'No products with available stock.';
+
+  @override
+  String get originalProduct => 'Original Product';
+
+  @override
+  String get replacedByProduct => 'Replaced By';
+
+  @override
+  String get replacementDate => 'Replacement Date';
+
+  @override
+  String get replacedByAdmin => 'Replaced By';
+
+  @override
+  String get skuLabel => 'SKU';
+
+  @override
+  String get availableQuantityLabel => 'Available Quantity';
+
+  @override
+  String replacementAssignedQty(String assigned, String required) {
+    return 'Assigned: $assigned / $required';
+  }
+
+  @override
+  String get confirmReplacements => 'Confirm replacements';
+
+  @override
+  String replacementQtyMustMatch(String required) {
+    return 'Total replacement quantity must equal $required.';
+  }
+
+  @override
+  String get changeReplacement => 'Change replacement';
 }

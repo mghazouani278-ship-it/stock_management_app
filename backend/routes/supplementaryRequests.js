@@ -3,7 +3,7 @@ const router = express.Router();
 const { getFirestore } = require('../firebase');
 const { admin } = require('../firebase');
 const updateStock = require('../utils/updateStock');
-const { protect, authorize, authorizeAdminOrWarehouse } = require('../middleware/auth');
+const {protect, authorize, authorizeAdminOrWarehouse, authorizeAdminLike} = require('../middleware/auth');
 const { createWarehouseSupplementaryNotification } = require('./supplementaryNotifications');
 const { projectRef, userRef } = require('../utils/embedRefs');
 const { parseProjectProductQty, setProjectMapQty } = require('../utils/projectProductsMap');
@@ -147,7 +147,7 @@ router.post('/', protect, async (req, res) => {
   }
 });
 
-router.put('/:id/approve', protect, authorize('admin'), async (req, res) => {
+router.put('/:id/approve', protect, authorizeAdminLike, async (req, res) => {
   try {
     const { store: storeId, depot: depotId } = req.body;
     const sid = storeId || depotId;
@@ -228,7 +228,7 @@ router.put('/:id/approve', protect, authorize('admin'), async (req, res) => {
   }
 });
 
-router.put('/:id/refuse', protect, authorize('admin'), async (req, res) => {
+router.put('/:id/refuse', protect, authorizeAdminLike, async (req, res) => {
   try {
     const firestore = getFirestore();
     const ref = firestore.collection('supplementary_requests').doc(req.params.id);

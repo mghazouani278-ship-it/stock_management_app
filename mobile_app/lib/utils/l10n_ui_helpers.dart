@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../l10n/app_localizations.dart';
 import '../models/return_model.dart';
 import '../providers/locale_provider.dart';
+import 'embedded_ref_localized.dart';
 import 'product_localized.dart';
 import 'project_localized.dart';
 
@@ -53,12 +54,7 @@ String localizedDamagedProjectName(BuildContext context, String name) {
 /// Store name when locale is AR (generic English tokens → Arabic).
 String localizedDamagedStoreName(BuildContext context, String name) {
   if (!_isArUi(context)) return name;
-  final raw = name.trim();
-  final lettersOnly = raw.replaceAll(RegExp(r'[^A-Za-z]'), '').toLowerCase();
-  if (lettersOnly == 'store') return 'متجر';
-  if (lettersOnly == 'warehouse') return 'مستودع';
-  if (lettersOnly == 'depot') return 'مستودع';
-  return raw;
+  return arabicLiteralStoreName(name);
 }
 
 /// Notes often reuse the same English phrases as [localizedDamageReason].
@@ -108,6 +104,12 @@ String localizedUserRole(BuildContext context, String role) {
   switch (r) {
     case 'admin':
       return l10n.roleAdmin;
+    case 'manager':
+      return l10n.roleManager;
+    case 'supervisor':
+      return l10n.roleSupervisor;
+    case 'finance':
+      return l10n.roleFinance;
     case 'user':
       return l10n.roleUser;
     case 'warehouse_user':

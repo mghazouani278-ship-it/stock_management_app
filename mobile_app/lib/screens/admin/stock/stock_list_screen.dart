@@ -26,7 +26,8 @@ List<Product> _filterStockDialogProducts(List<Product> sorted, String query) {
 }
 
 class StockListScreen extends StatefulWidget {
-  const StockListScreen({super.key});
+  final bool readOnly;
+  const StockListScreen({super.key, this.readOnly = false});
 
   @override
   State<StockListScreen> createState() => _StockListScreenState();
@@ -190,45 +191,50 @@ class _StockListScreenState extends State<StockListScreen> {
     });
     try {
       final Map<String, int> addedMap = {};
-      try {
-        final nRes = await _apiService.get('/stock/notifications');
-        if (nRes['success'] == true && nRes['data'] != null) {
-          for (final e in (nRes['data'] as List)) {
-            final m = Map<String, dynamic>.from(e as Map);
-            final rd = m['read'];
-            if (rd == true || rd == 'true') continue;
-            final pid = _normId((m['productId'] ?? m['product_id'])?.toString());
-            final sid = _normId((m['storeId'] ?? m['store_id'])?.toString());
-            if (pid.isEmpty || sid.isEmpty) continue;
-            final colRaw = _normId((m['variant'] ?? m['color'])?.toString());
-            final raw = m['quantityChange'] ?? m['quantity_change'] ?? 0;
-            final dv = raw is int ? raw : int.tryParse(raw.toString()) ?? 0;
-            if (dv == 0) continue;
-            final k = _productStoreColorKey(pid, sid, colRaw.isEmpty ? null : colRaw);
-            addedMap[k] = (addedMap[k] ?? 0) + dv;
+      if (!widget.readOnly) {
+        try {
+          final nRes = await _apiService.get('/stock/notifications');
+          if (nRes['success'] == true && nRes['data'] != null) {
+            for (final e in (nRes['data'] as List)) {
+              final m = Map<String, dynamic>.from(e as Map);
+              final rd = m['read'];
+              if (rd == true || rd == 'true') continue;
+              final pid = _normId((m['productId'] ?? m['product_id'])?.toString());
+              final sid = _normId((m['storeId'] ?? m['store_id'])?.toString());
+              if (pid.isEmpty || sid.isEmpty) continue;
+              final colRaw = _normId((m['variant'] ?? m['color'])?.toString());
+              final raw = m['quantityChange'] ?? m['quantity_change'] ?? 0;
+              final dv = raw is int ? raw : int.tryParse(raw.toString()) ?? 0;
+              if (dv == 0) continue;
+              final k = _productStoreColorKey(pid, sid, colRaw.isEmpty ? null : colRaw);
+              addedMap[k] = (addedMap[k] ?? 0) + dv;
+            }
           }
-        }
-      } catch (_) {}
-      final results = await Future.wait([
-        _apiService.get('/stock'),
-        _apiService.get('/products'),
-        _apiService.get('/stores'),
-      ]);
-      final res = results[0];
-      final productsRes = results[1];
-      final storesRes = results[2];
+        } catch (_) {}
+      }
+
+      // Load stock first (critical). Products/stores are best-effort so Finance
+      // is not blocked if a secondary route is denied on an outdated server.
+      final res = await _apiService.get('/stock');
       var products = List<Product>.from(_products);
       var stores = List<Store>.from(_stores);
-      if (productsRes['success'] == true && productsRes['data'] != null) {
-        products = (productsRes['data'] as List)
-            .map((e) => Product.fromJson(Map<String, dynamic>.from(e)))
-            .toList();
-      }
-      if (storesRes['success'] == true && storesRes['data'] != null) {
-        stores = (storesRes['data'] as List)
-            .map((e) => Store.fromJson(Map<String, dynamic>.from(e)))
-            .toList();
-      }
+      try {
+        final productsRes = await _apiService.get('/products');
+        if (productsRes['success'] == true && productsRes['data'] != null) {
+          products = (productsRes['data'] as List)
+              .map((e) => Product.fromJson(Map<String, dynamic>.from(e)))
+              .toList();
+        }
+      } catch (_) {}
+      try {
+        final storesRes = await _apiService.get('/stores');
+        if (storesRes['success'] == true && storesRes['data'] != null) {
+          stores = (storesRes['data'] as List)
+              .map((e) => Store.fromJson(Map<String, dynamic>.from(e)))
+              .toList();
+        }
+      } catch (_) {}
+
       if (res['success'] == true && res['data'] != null) {
         setState(() {
           _stocks = (res['data'] as List)
@@ -956,10 +962,12 @@ class _StockListScreenState extends State<StockListScreen> {
         ],
       ),
       body: _buildBody(),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _showAddStock,
-        child: const Icon(Icons.add),
-      ),
+      floatingActionButton: widget.readOnly
+          ? null
+          : FloatingActionButton(
+              onPressed: _showAddStock,
+              child: const Icon(Icons.add),
+            ),
     ),
     );
   }
@@ -982,7 +990,8 @@ class _StockListScreenState extends State<StockListScreen> {
               const SizedBox(height: 8),
               Text(AppLocalizations.of(context)!.tapToAddStock, textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey)),
               const SizedBox(height: 24),
-              FilledButton.icon(onPressed: _showAddStock, icon: const Icon(Icons.add), label: Text(AppLocalizations.of(context)!.addStock)),
+              if (!widget.readOnly)
+                FilledButton.icon(onPressed: _showAddStock, icon: const Icon(Icons.add), label: Text(AppLocalizations.of(context)!.addStock)),
             ],
           ),
         ),

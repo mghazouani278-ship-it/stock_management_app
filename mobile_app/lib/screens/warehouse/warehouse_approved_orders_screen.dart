@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/l10n_ui_helpers.dart';
 import '../../utils/product_localized.dart';
+import '../../utils/project_localized.dart';
 import '../../widgets/connection_error_widget.dart';
 import 'warehouse_distribution_form_screen.dart';
 
@@ -19,6 +21,8 @@ class _WarehouseApprovedOrdersScreenState extends State<WarehouseApprovedOrdersS
   /// Unread `new_order` — red banners (same style as former admin view).
   List<Map<String, dynamic>> _newOrderNotifications = [];
   List<Map<String, dynamic>> _approvedNotifications = [];
+  /// Order ids that already have a distribution / are completed.
+  final Set<String> _distributedOrderIds = {};
   bool _loading = true;
   String? _error;
 
@@ -33,7 +37,10 @@ class _WarehouseApprovedOrdersScreenState extends State<WarehouseApprovedOrdersS
   Widget _buildNewOrderBanner(Map<String, dynamic> n) {
     final l10n = AppLocalizations.of(context)!;
     final bg = _colorFromApi(n['bannerBackground']?.toString()) ?? const Color(0xFFC62828);
-    final projectName = n['projectName'] ?? n['project_name'] ?? '—';
+    final projectName = localizedProjectName(
+      context,
+      (n['projectName'] ?? n['project_name'] ?? '').toString(),
+    );
     final userName = n['userName'] ?? n['user_name'];
     final productsRaw = n['products'] ?? n['Products'];
     final products = (productsRaw is List) ? productsRaw : [];
@@ -47,7 +54,7 @@ class _WarehouseApprovedOrdersScreenState extends State<WarehouseApprovedOrdersS
           child: Icon(Icons.notifications_active, color: bg, size: 22),
         ),
         title: Text(
-          projectName.toString(),
+          projectName.isNotEmpty ? projectName : '—',
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         subtitle: Column(
@@ -59,7 +66,7 @@ class _WarehouseApprovedOrdersScreenState extends State<WarehouseApprovedOrdersS
             ),
             if (userName != null && userName.toString().isNotEmpty)
               Text(
-                l10n.userLabel(userName.toString()),
+                l10n.userLabel(localizedDisplayUserName(context, userName.toString())),
                 style: TextStyle(fontSize: 12, color: Colors.grey[600]),
               ),
             if (orderId.isNotEmpty)
@@ -97,13 +104,23 @@ class _WarehouseApprovedOrdersScreenState extends State<WarehouseApprovedOrdersS
         final all = (res['data'] as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
         final approved = <Map<String, dynamic>>[];
         final newUnread = <Map<String, dynamic>>[];
+        final approvedOrderIds = <String>{};
+        for (final n in all) {
+          if (n['type'] == 'order_approved') {
+            approved.add(n);
+            final oid = n['orderId']?.toString() ?? '';
+            if (oid.isNotEmpty) approvedOrderIds.add(oid);
+          }
+        }
         for (final n in all) {
           final t = n['type'];
-          if (t == 'order_approved') {
-            approved.add(n);
-          } else if (t == 'new_order') {
+          if (t == 'new_order') {
             final rd = n['read'];
-            if (rd != true && rd != 'true') newUnread.add(n);
+            final oid = n['orderId']?.toString() ?? '';
+            // Hide "New Order" once manager already approved the same order.
+            if (rd != true && rd != 'true' && (oid.isEmpty || !approvedOrderIds.contains(oid))) {
+              newUnread.add(n);
+            }
           }
         }
         if (mounted) setState(() {
@@ -111,6 +128,7 @@ class _WarehouseApprovedOrdersScreenState extends State<WarehouseApprovedOrdersS
           _newOrderNotifications = newUnread;
           _loading = false;
         });
+        await _refreshDistributedOrderIds(approved);
       } else {
         if (mounted) setState(() => _loading = false);
       }
@@ -122,6 +140,90 @@ class _WarehouseApprovedOrdersScreenState extends State<WarehouseApprovedOrdersS
     }
   }
 
+  Future<void> _refreshDistributedOrderIds(List<Map<String, dynamic>> approved) async {
+    final ids = approved
+        .map((n) => n['orderId']?.toString() ?? '')
+        .where((id) => id.isNotEmpty)
+        .toSet();
+    if (ids.isEmpty) {
+      if (mounted) setState(() => _distributedOrderIds.clear());
+      return;
+    }
+    final distributed = <String>{};
+    try {
+      final res = await _apiService.get('/orders');
+      if (res['success'] == true && res['data'] is List) {
+        for (final raw in res['data'] as List) {
+          if (raw is! Map) continue;
+          final id = (raw['id'] ?? raw['_id'])?.toString() ?? '';
+          if (!ids.contains(id)) continue;
+          final st = raw['status']?.toString().toLowerCase() ?? '';
+          if (st == 'completed') distributed.add(id);
+        }
+      }
+    } catch (_) {
+      // Fall back: check distributions per order when list fetch fails.
+      for (final id in ids) {
+        try {
+          final dRes = await _apiService.get('/distributions', queryParams: {'order': id});
+          if (dRes['success'] == true) {
+            final c = dRes['count'];
+            final has = (c is int && c > 0) || (dRes['data'] is List && (dRes['data'] as List).isNotEmpty);
+            if (has) distributed.add(id);
+          }
+        } catch (_) {}
+      }
+    }
+    if (mounted) setState(() {
+      _distributedOrderIds
+        ..clear()
+        ..addAll(distributed);
+    });
+  }
+
+  int _parseQty(dynamic v) {
+    if (v == null) return 0;
+    if (v is int) return v;
+    if (v is num) return v.round();
+    return int.tryParse(v.toString()) ?? 0;
+  }
+
+  List<Map<String, dynamic>> _productsFromOrderData(Map<String, dynamic> data) {
+    final orderProductsRaw = data['products'];
+    if (orderProductsRaw is! List) return <Map<String, dynamic>>[];
+    final out = <Map<String, dynamic>>[];
+    for (final e in orderProductsRaw) {
+      if (e is! Map) continue;
+      final p = Map<String, dynamic>.from(e);
+      final prod = p['product'];
+      final repl = p['replacementProduct'] ?? p['replacement_product'];
+      String? productId;
+      String? productName;
+      String? unit;
+      if (repl is Map && (p['isReplaced'] == true || p['is_replaced'] == true || p['replacementProductId'] != null)) {
+        productId = (repl['id'] ?? repl['_id'])?.toString();
+        productName = repl['name']?.toString();
+        unit = repl['unit']?.toString();
+      }
+      if (productId == null && prod is Map) {
+        productId = (prod['id'] ?? prod['_id'])?.toString();
+        productName = prod['name']?.toString();
+        unit = prod['unit']?.toString();
+      } else if (productId == null && prod != null) {
+        productId = prod.toString();
+        productName = p['name']?.toString() ?? p['productName']?.toString();
+      }
+      out.add({
+        'productId': productId,
+        'productName': productName,
+        'quantity': _parseQty(p['quantity']),
+        'color': p['color'] ?? p['variant'],
+        'unit': unit,
+      });
+    }
+    return out;
+  }
+
   Future<void> _markAsRead() async {
     try {
       await _apiService.put('/order-notifications/read', {});
@@ -129,7 +231,7 @@ class _WarehouseApprovedOrdersScreenState extends State<WarehouseApprovedOrdersS
     } catch (_) {}
   }
 
-  void _showDetails(Map<String, dynamic> notif) async {
+  Future<void> _showDetails(Map<String, dynamic> notif) async {
     final l10n = AppLocalizations.of(context)!;
     final orderId = notif['orderId']?.toString() ?? '';
     final productsRaw = notif['products'] ?? notif['Products'];
@@ -138,24 +240,36 @@ class _WarehouseApprovedOrdersScreenState extends State<WarehouseApprovedOrdersS
         : <Map<String, dynamic>>[];
     var type = notif['type']?.toString() ?? '';
     var status = notif['status']?.toString().toLowerCase() ?? '';
+
+    // Prefer products already on the green approved notification for this order.
     if (products.isEmpty && orderId.isNotEmpty) {
+      for (final a in _approvedNotifications) {
+        if (a['orderId']?.toString() != orderId) continue;
+        final raw = a['products'] ?? a['Products'];
+        if (raw is List && raw.isNotEmpty) {
+          products = raw
+              .map((e) => e is Map ? Map<String, dynamic>.from(e) : <String, dynamic>{})
+              .toList();
+          type = 'order_approved';
+          status = 'approved';
+          break;
+        }
+      }
+    }
+
+    // Always refresh from the order so warehouse sees manager approval immediately.
+    if (orderId.isNotEmpty && mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const Center(child: CircularProgressIndicator()),
+      );
       try {
         final orderRes = await _apiService.get('/orders/$orderId');
         if (orderRes['success'] == true && orderRes['data'] != null) {
           final data = Map<String, dynamic>.from(orderRes['data'] as Map);
-          final orderProductsRaw = data['products'];
-          if (orderProductsRaw is List) {
-            products = orderProductsRaw
-                .map((e) => e is Map ? Map<String, dynamic>.from(e) : <String, dynamic>{})
-                .map((p) => <String, dynamic>{
-                      'productId': p['product']?['id'] ?? p['product'],
-                      'productName': p['product']?['name'] ?? p['name'],
-                      'quantity': p['quantity'] ?? 0,
-                      'color': p['color'] ?? p['variant'],
-                      'unit': p['product']?['unit'],
-                    })
-                .toList();
-          }
+          final fromOrder = _productsFromOrderData(data);
+          if (fromOrder.isNotEmpty) products = fromOrder;
           status = data['status']?.toString().toLowerCase() ?? status;
           if (status == 'approved' || status == 'completed') {
             type = 'order_approved';
@@ -163,8 +277,11 @@ class _WarehouseApprovedOrdersScreenState extends State<WarehouseApprovedOrdersS
         }
       } catch (_) {
         // Keep notification payload if order fetch fails.
+      } finally {
+        if (mounted) Navigator.of(context, rootNavigator: true).pop();
       }
     }
+    if (!mounted) return;
     var alreadyHasDistribution = false;
     if (orderId.isNotEmpty) {
       try {
@@ -182,8 +299,12 @@ class _WarehouseApprovedOrdersScreenState extends State<WarehouseApprovedOrdersS
     final canCreateDistribution =
         (type == 'order_approved' || status == 'approved' || status == 'completed') &&
         !alreadyHasDistribution;
-    final isGreenState = canCreateDistribution || alreadyHasDistribution;
-    final projectName = notif['projectName'] ?? notif['project_name'] ?? '—';
+    // Red while waiting for warehouse distribution; green once distributed.
+    final isGreenState = alreadyHasDistribution;
+    final projectName = localizedProjectName(
+      context,
+      (notif['projectName'] ?? notif['project_name'] ?? '').toString(),
+    );
     final userName = notif['userName'] ?? notif['user_name'];
     showModalBottomSheet(
       context: context,
@@ -249,7 +370,7 @@ class _WarehouseApprovedOrdersScreenState extends State<WarehouseApprovedOrdersS
               if (userName != null && userName.toString().isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: 12),
-                  child: Text(l10n.userLabel(userName.toString())),
+                  child: Text(l10n.userLabel(localizedDisplayUserName(context, userName.toString()))),
                 ),
               const SizedBox(height: 16),
               Text(l10n.approvedQuantities, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
@@ -388,22 +509,37 @@ class _WarehouseApprovedOrdersScreenState extends State<WarehouseApprovedOrdersS
             final productsRaw = n['products'] ?? n['Products'];
             final products = (productsRaw is List) ? productsRaw : [];
             final totalQty = products.fold<int>(0, (sum, p) => sum + ((p is Map ? p['quantity'] : null) as int? ?? 0));
-            final projectName = n['projectName'] ?? n['project_name'] ?? l10n.order;
-            final orderId = n['orderId'] ?? '';
+            final projectNameRaw = (n['projectName'] ?? n['project_name'] ?? '').toString();
+            final projectName = projectNameRaw.isEmpty
+                ? l10n.order
+                : localizedProjectName(context, projectNameRaw);
+            final orderId = n['orderId']?.toString() ?? '';
+            final isDistributed = orderId.isNotEmpty && _distributedOrderIds.contains(orderId);
+            const red = Color(0xFFC62828);
+            final accent = isDistributed ? Colors.green : red;
             return Card(
               margin: const EdgeInsets.only(bottom: 8),
+              color: isDistributed ? null : red.withOpacity(0.06),
               child: ListTile(
                 leading: CircleAvatar(
-                  backgroundColor: Colors.green.withOpacity(0.2),
-                  child: const Icon(Icons.check_circle, color: Colors.green, size: 24),
+                  backgroundColor: accent.withOpacity(0.2),
+                  child: Icon(
+                    isDistributed ? Icons.check_circle : Icons.pending_actions,
+                    color: accent,
+                    size: 24,
+                  ),
                 ),
                 title: Text(
                   projectName,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                  style: TextStyle(fontWeight: FontWeight.bold, color: isDistributed ? null : red),
                 ),
                 subtitle: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Text(
+                      isDistributed ? l10n.orderStatusCompleted : l10n.newOrder,
+                      style: TextStyle(fontSize: 12, color: accent, fontWeight: FontWeight.w600),
+                    ),
                     if (orderId.isNotEmpty)
                       Text(l10n.orderNumberPrefix(orderId.substring(0, orderId.length > 8 ? 8 : orderId.length)), style: TextStyle(fontSize: 12, color: Colors.grey[600])),
                     Text(
@@ -412,7 +548,7 @@ class _WarehouseApprovedOrdersScreenState extends State<WarehouseApprovedOrdersS
                     ),
                   ],
                 ),
-                trailing: const Icon(Icons.chevron_right),
+                trailing: Icon(Icons.chevron_right, color: accent),
                 onTap: () => _showDetails(n),
               ),
             );

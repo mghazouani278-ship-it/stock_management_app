@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../models/user.dart';
 import '../../../services/api_service.dart';
+import '../../../utils/project_localized.dart';
+import '../../../utils/roles.dart';
 
 class UserFormScreen extends StatefulWidget {
   final User? user;
@@ -21,7 +23,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
   final _apiService = ApiService();
 
   String _role = 'user';
-  String? _projectId;
+  final Set<String> _projectIds = {};
   bool _isActive = true;
   List<Map<String, dynamic>> _projects = [];
   bool _loading = false;
@@ -39,7 +41,10 @@ class _UserFormScreenState extends State<UserFormScreen> {
       _nameArController.text = u.nameAr ?? '';
       _emailController.text = u.email;
       _role = u.role;
-      _projectId = u.project?.id;
+      _projectIds.addAll(u.projectIds);
+      if (_projectIds.isEmpty && u.project?.id != null) {
+        _projectIds.add(u.project!.id);
+      }
       _isActive = u.isActive;
     }
     _loadProjects();
@@ -73,6 +78,17 @@ class _UserFormScreenState extends State<UserFormScreen> {
     super.dispose();
   }
 
+  Map<String, dynamic> _projectPayload() {
+    if (!roleNeedsProjects(_role)) {
+      return {'projectId': null, 'projectIds': <String>[]};
+    }
+    final ids = _projectIds.toList();
+    return {
+      'projectId': ids.isNotEmpty ? ids.first : null,
+      'projectIds': ids,
+    };
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() {
@@ -80,13 +96,14 @@ class _UserFormScreenState extends State<UserFormScreen> {
       _error = null;
     });
     try {
+      final proj = _projectPayload();
       if (_isEdit) {
         final payload = <String, dynamic>{
           'name': _nameController.text.trim(),
           'nameAr': _nameArController.text.trim().isEmpty ? null : _nameArController.text.trim(),
           'email': _emailController.text.trim().toLowerCase(),
           'role': _role,
-          'projectId': _role == 'user' ? _projectId : null,
+          ...proj,
           'isActive': _isActive,
         };
         if (_passwordController.text.trim().isNotEmpty) {
@@ -105,7 +122,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
           'email': _emailController.text.trim().toLowerCase(),
           'password': _passwordController.text,
           'role': _role,
-          'projectId': _role == 'user' ? _projectId : null,
+          ...proj,
         });
         if (res['success'] == true && context.mounted) {
           Navigator.pop(context, true);
@@ -164,7 +181,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
                 controller: _passwordController,
                 obscureText: true,
                 decoration: InputDecoration(
-                  labelText: _isEdit ? '${l10n.password} (optional)' : l10n.password,
+                  labelText: _isEdit ? l10n.passwordOptional : l10n.password,
                   border: const OutlineInputBorder(),
                 ),
                 validator: (v) {
@@ -184,35 +201,46 @@ class _UserFormScreenState extends State<UserFormScreen> {
                 items: [
                   DropdownMenuItem(value: 'user', child: Text(l10n.roleUser)),
                   DropdownMenuItem(value: 'admin', child: Text(l10n.roleAdmin)),
+                  DropdownMenuItem(value: 'manager', child: Text(l10n.roleManager)),
+                  DropdownMenuItem(value: 'supervisor', child: Text(l10n.roleSupervisor)),
                   DropdownMenuItem(value: 'warehouse_user', child: Text(l10n.roleWarehouse)),
+                  DropdownMenuItem(value: 'finance', child: Text(l10n.roleFinance)),
                 ],
                 onChanged: (v) => setState(() {
                   _role = v ?? 'user';
-                  if (_role != 'user') _projectId = null;
+                  if (!roleNeedsProjects(_role)) _projectIds.clear();
                 }),
               ),
-              if (_role == 'user') ...[
+              if (roleNeedsProjects(_role)) ...[
                 const SizedBox(height: 16),
-                _loadingProjects
-                    ? const CircularProgressIndicator()
-                    : DropdownButtonFormField<String>(
-                        value: _projectId,
-                        decoration: InputDecoration(
-                          labelText: l10n.projectOptional,
-                          border: const OutlineInputBorder(),
-                        ),
-                        items: [
-                          DropdownMenuItem(
-                            value: null,
-                            child: Text(l10n.none),
-                          ),
-                          ..._projects.map((p) => DropdownMenuItem(
-                                value: p['id'] ?? p['_id'],
-                                child: Text(p['name'] ?? ''),
-                              )),
-                        ],
-                        onChanged: (v) => setState(() => _projectId = v),
-                      ),
+                Text(l10n.projects, style: const TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                if (_loadingProjects)
+                  const Center(child: CircularProgressIndicator())
+                else
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _projects.map((p) {
+                      final id = (p['id'] ?? p['_id']).toString();
+                      final selected = _projectIds.contains(id);
+                      final name = (p['name'] ?? id).toString();
+                      final nameAr = p['nameAr']?.toString() ?? p['name_ar']?.toString();
+                      return FilterChip(
+                        label: Text(localizedProjectName(context, name, nameAr: nameAr)),
+                        selected: selected,
+                        onSelected: (v) {
+                          setState(() {
+                            if (v) {
+                              _projectIds.add(id);
+                            } else {
+                              _projectIds.remove(id);
+                            }
+                          });
+                        },
+                      );
+                    }).toList(),
+                  ),
               ],
               if (_isEdit) ...[
                 const SizedBox(height: 16),

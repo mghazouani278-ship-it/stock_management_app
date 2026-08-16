@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { getFirestore } = require('../firebase');
 const { admin } = require('../firebase');
-const { protect, authorize, authorizeAdminOrWarehouse } = require('../middleware/auth');
+const {protect, authorize, authorizeAdminOrWarehouse, authorizeAdminLike, authorizeStockRead} = require('../middleware/auth');
 const { toApi } = require('../utils/firestoreToApi');
 
 function storeToApi(doc) {
@@ -13,7 +13,7 @@ function storeToApi(doc) {
   return o;
 }
 
-router.get('/', protect, authorizeAdminOrWarehouse, async (req, res) => {
+router.get('/', protect, authorizeStockRead, async (req, res) => {
   try {
     const firestore = getFirestore();
     const snapshot = await firestore.collection('stores').orderBy('created_at', 'desc').get();
@@ -37,7 +37,7 @@ router.get('/:id', protect, authorizeAdminOrWarehouse, async (req, res) => {
   }
 });
 
-router.post('/', protect, authorize('admin'), async (req, res) => {
+router.post('/', protect, authorizeAdminLike, async (req, res) => {
   try {
     const { name, nameAr, location, description } = req.body;
     if (!name) {
@@ -64,7 +64,7 @@ router.post('/', protect, authorize('admin'), async (req, res) => {
   }
 });
 
-router.put('/:id', protect, authorize('admin'), async (req, res) => {
+router.put('/:id', protect, authorizeAdminLike, async (req, res) => {
   try {
     const { name, nameAr, location, description } = req.body;
     const firestore = getFirestore();
@@ -94,7 +94,7 @@ router.put('/:id', protect, authorize('admin'), async (req, res) => {
   }
 });
 
-router.delete('/:id', protect, authorize('admin'), async (req, res) => {
+router.delete('/:id', protect, authorizeAdminLike, async (req, res) => {
   try {
     const firestore = getFirestore();
     const ref = firestore.collection('stores').doc(req.params.id);

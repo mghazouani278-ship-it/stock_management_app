@@ -5,6 +5,7 @@ const { admin } = require('../firebase');
 const updateStock = require('../utils/updateStock');
 const { protect } = require('../middleware/auth');
 const { projectRef, userRef } = require('../utils/embedRefs');
+const { isUser, isSupervisor, userHasProjectAccess } = require('../utils/roles');
 
 function normalizeColor(c) {
   if (c == null || c === '') return null;
@@ -64,14 +65,22 @@ function _normalizeRole(role) {
 router.get('/', protect, async (req, res) => {
   try {
     const firestore = getFirestore();
-    const role = _normalizeRole(req.user.role);
+    const role = req.user.role;
     let docs;
-    if (role === 'user') {
+    if (isUser(role)) {
       const snapshot = await firestore.collection('returns').where('user_id', '==', req.user.id).get();
       docs = snapshot.docs;
+      const allowed = (req.user.project_ids || []).map(String);
+      if (allowed.length > 0) {
+        docs = docs.filter((d) => allowed.includes(String(d.data().project_id)));
+      }
     } else {
       const snapshot = await firestore.collection('returns').get();
       docs = snapshot.docs;
+      if (isSupervisor(role)) {
+        const allowed = (req.user.project_ids || []).map(String);
+        docs = docs.filter((d) => allowed.includes(String(d.data().project_id)));
+      }
       if (req.query.user) docs = docs.filter(d => d.data().user_id === req.query.user);
       if (req.query.project) docs = docs.filter(d => d.data().project_id === req.query.project);
       if (req.query.status) docs = docs.filter(d => d.data().status === req.query.status);
@@ -88,12 +97,51 @@ router.get('/', protect, async (req, res) => {
   }
 });
 
+router.get('/count', protect, async (req, res) => {
+  try {
+    const firestore = getFirestore();
+    const role = req.user.role;
+    let docs;
+    if (isUser(role)) {
+      const snapshot = await firestore.collection('returns').where('user_id', '==', req.user.id).get();
+      docs = snapshot.docs;
+      const allowed = (req.user.project_ids || []).map(String);
+      if (allowed.length > 0) {
+        docs = docs.filter((d) => allowed.includes(String(d.data().project_id)));
+      }
+    } else if (req.query.status) {
+      const snapshot = await firestore.collection('returns').where('status', '==', String(req.query.status)).get();
+      docs = snapshot.docs;
+    } else {
+      const snapshot = await firestore.collection('returns').get();
+      docs = snapshot.docs;
+    }
+    if (isSupervisor(role)) {
+      const allowed = (req.user.project_ids || []).map(String);
+      docs = docs.filter((d) => allowed.includes(String(d.data().project_id)));
+    }
+    if (req.query.user) docs = docs.filter((d) => d.data().user_id === req.query.user);
+    if (req.query.project) docs = docs.filter((d) => d.data().project_id === req.query.project);
+    if (req.query.status && isUser(role)) {
+      docs = docs.filter((d) => d.data().status === req.query.status);
+    }
+    res.json({ success: true, count: docs.length });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 router.get('/:id', protect, async (req, res) => {
   try {
     const firestore = getFirestore();
     const doc = await firestore.collection('returns').doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ success: false, message: 'Return not found' });
-    if (_normalizeRole(req.user.role) === 'user' && doc.data().user_id !== req.user.id) return res.status(403).json({ success: false, message: 'You do not have access to this return' });
+    if (isUser(req.user.role) && doc.data().user_id !== req.user.id) {
+      return res.status(403).json({ success: false, message: 'You do not have access to this return' });
+    }
+    if (isSupervisor(req.user.role) && !userHasProjectAccess(req.user, doc.data().project_id)) {
+      return res.status(403).json({ success: false, message: 'You do not have access to this return' });
+    }
     const data = await returnToApi(doc, firestore);
     res.json({ success: true, data });
   } catch (error) {

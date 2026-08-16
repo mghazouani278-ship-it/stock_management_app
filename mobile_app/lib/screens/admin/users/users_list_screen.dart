@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../models/user.dart';
+import '../../../providers/auth_provider.dart';
 import '../../../providers/locale_provider.dart';
 import '../../../services/api_service.dart';
 import '../../../utils/l10n_ui_helpers.dart';
 import '../../../utils/project_localized.dart';
+import '../../../utils/roles.dart';
 import '../../../widgets/connection_error_widget.dart';
 import '../../../widgets/app_search_bar.dart';
 import 'user_form_screen.dart';
@@ -71,7 +73,9 @@ class _UsersListScreenState extends State<UsersListScreen> {
       _error = null;
     });
     try {
-      final res = await _apiService.get('/users');
+      final role = Provider.of<AuthProvider>(context, listen: false).user?.role;
+      final path = (role == 'supervisor') ? '/users/for-supervisor' : '/users';
+      final res = await _apiService.get(path);
       if (res['success'] == true && res['data'] != null) {
         setState(() {
           _users = (res['data'] as List)
@@ -144,10 +148,75 @@ class _UsersListScreenState extends State<UsersListScreen> {
     }
   }
 
+  Future<void> _showUserDetails(User user) async {
+    final l10n = AppLocalizations.of(context)!;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.45,
+        maxChildSize: 0.85,
+        expand: false,
+        builder: (_, controller) => SingleChildScrollView(
+          controller: controller,
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              Text(
+                localizedDisplayUserName(context, user.name, nameAr: user.nameAr),
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Chip(
+                label: Text(localizedUserRole(context, user.role), style: const TextStyle(fontSize: 12)),
+                backgroundColor: user.isActive
+                    ? Colors.green.withOpacity(0.2)
+                    : Colors.grey.withOpacity(0.2),
+              ),
+              const SizedBox(height: 16),
+              Text(l10n.email, style: const TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 4),
+              Text(user.email, style: TextStyle(fontSize: 14, color: Colors.grey[700])),
+              if (user.project != null) ...[
+                const SizedBox(height: 16),
+                Text(l10n.projects, style: const TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 4),
+                Text(
+                  user.project!.displayName(context),
+                  style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                ),
+              ],
+              const SizedBox(height: 16),
+              Text(l10n.status, style: const TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 4),
+              Text(
+                user.isActive ? l10n.active : l10n.inactive,
+                style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     context.watch<LocaleProvider>();
     final l10n = AppLocalizations.of(context)!;
+    final canManageUsers = !isSupervisor(context.watch<AuthProvider>().user?.role);
     return Scaffold(
       appBar: AppBar(
         title: AppSearchBar(
@@ -169,21 +238,23 @@ class _UsersListScreenState extends State<UsersListScreen> {
           ),
         ],
       ),
-      body: _buildBody(),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          final added = await Navigator.push<bool>(
-            context,
-            MaterialPageRoute(builder: (_) => const UserFormScreen()),
-          );
-          if (added == true && mounted) _loadUsers();
-        },
-        child: const Icon(Icons.add),
-      ),
+      body: _buildBody(canManageUsers: canManageUsers),
+      floatingActionButton: canManageUsers
+          ? FloatingActionButton(
+              onPressed: () async {
+                final added = await Navigator.push<bool>(
+                  context,
+                  MaterialPageRoute(builder: (_) => const UserFormScreen()),
+                );
+                if (added == true && mounted) _loadUsers();
+              },
+              child: const Icon(Icons.add),
+            )
+          : null,
     );
   }
 
-  Widget _buildBody() {
+  Widget _buildBody({required bool canManageUsers}) {
     if (_loading && _users.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -192,7 +263,11 @@ class _UsersListScreenState extends State<UsersListScreen> {
     }
     if (_users.isEmpty) {
       return Center(
-        child: Text(AppLocalizations.of(context)!.noUsersTapAdd),
+        child: Text(
+          canManageUsers
+              ? AppLocalizations.of(context)!.noUsersTapAdd
+              : AppLocalizations.of(context)!.noUsersMatch,
+        ),
       );
     }
     final items = _filteredUsers(context);
@@ -211,6 +286,7 @@ class _UsersListScreenState extends State<UsersListScreen> {
           return Card(
             margin: const EdgeInsets.only(bottom: 8),
             child: ListTile(
+              onTap: canManageUsers ? null : () => _showUserDetails(user),
               leading: CircleAvatar(
                 backgroundColor: user.isActive ? Colors.green : Colors.grey,
                 child: Text(
@@ -258,7 +334,9 @@ class _UsersListScreenState extends State<UsersListScreen> {
               ),
               trailing: PopupMenuButton<String>(
                 onSelected: (value) async {
-                  if (value == 'edit') {
+                  if (value == 'display') {
+                    await _showUserDetails(user);
+                  } else if (value == 'edit' && canManageUsers) {
                     final updated = await Navigator.push<bool>(
                       context,
                       MaterialPageRoute(
@@ -266,9 +344,9 @@ class _UsersListScreenState extends State<UsersListScreen> {
                       ),
                     );
                     if (updated == true && mounted) _loadUsers();
-                  } else if (value == 'toggle') {
+                  } else if (value == 'toggle' && canManageUsers) {
                     await _toggleActive(user);
-                  } else if (value == 'delete') {
+                  } else if (value == 'delete' && canManageUsers) {
                     await _deleteUser(user);
                   }
                 },
@@ -276,35 +354,47 @@ class _UsersListScreenState extends State<UsersListScreen> {
                   final l10n = AppLocalizations.of(context)!;
                   return [
                     PopupMenuItem(
-                      value: 'edit',
+                      value: 'display',
                       child: Row(
                         children: [
-                          const Icon(Icons.edit),
+                          const Icon(Icons.visibility),
                           const SizedBox(width: 8),
-                          Text(l10n.edit),
+                          Text(l10n.display),
                         ],
                       ),
                     ),
-                    PopupMenuItem(
-                      value: 'toggle',
-                      child: Row(
-                        children: [
-                          Icon(user.isActive ? Icons.block : Icons.check_circle),
-                          const SizedBox(width: 8),
-                          Text(user.isActive ? l10n.deactivate : l10n.activate),
-                        ],
+                    if (canManageUsers) ...[
+                      PopupMenuItem(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            const Icon(Icons.edit),
+                            const SizedBox(width: 8),
+                            Text(l10n.edit),
+                          ],
+                        ),
                       ),
-                    ),
-                    PopupMenuItem(
-                      value: 'delete',
-                      child: Row(
-                        children: [
-                          const Icon(Icons.delete, color: Colors.red),
-                          const SizedBox(width: 8),
-                          Text(l10n.delete, style: const TextStyle(color: Colors.red)),
-                        ],
+                      PopupMenuItem(
+                        value: 'toggle',
+                        child: Row(
+                          children: [
+                            Icon(user.isActive ? Icons.block : Icons.check_circle),
+                            const SizedBox(width: 8),
+                            Text(user.isActive ? l10n.deactivate : l10n.activate),
+                          ],
+                        ),
                       ),
-                    ),
+                      PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            const Icon(Icons.delete, color: Colors.red),
+                            const SizedBox(width: 8),
+                            Text(l10n.delete, style: const TextStyle(color: Colors.red)),
+                          ],
+                        ),
+                      ),
+                    ],
                   ];
                 },
               ),

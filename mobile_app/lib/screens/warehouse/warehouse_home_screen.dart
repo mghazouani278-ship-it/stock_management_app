@@ -85,23 +85,35 @@ class _WarehouseHomeScreenState extends State<WarehouseHomeScreen> with RouteAwa
   Future<void> _loadBadgeCounts() async {
     try {
       final results = await Future.wait([
-        _apiService.get('/orders', queryParams: {'status': 'pending'}),
+        _apiService.get('/orders/count', queryParams: {'status': 'pending'}),
         _apiService.get('/order-notifications'),
-        _apiService.get('/returns', queryParams: {'status': 'pending'}),
-        _apiService.get('/distributions', queryParams: {'status': 'pending'}),
+        _apiService.get('/returns/count', queryParams: {'status': 'pending'}),
+        _apiService.get('/distributions/count', queryParams: {'status': 'pending'}),
         _apiService.get('/damaged-products', queryParams: {'status': 'pending'}),
       ]);
       if (mounted) {
         final orderNotifs = results[1] is Map && results[1]['data'] is List
-            ? (results[1]['data'] as List).where((n) {
-                final m = n as Map;
-                if (m['type'] == 'order_approved') return true;
-                if (m['type'] == 'new_order') {
-                  final rd = m['read'];
-                  return rd != true && rd != 'true';
+            ? () {
+                final all = (results[1]['data'] as List).map((n) => n as Map).toList();
+                final approvedIds = <String>{};
+                for (final m in all) {
+                  if (m['type'] == 'order_approved') {
+                    final oid = m['orderId']?.toString() ?? '';
+                    if (oid.isNotEmpty) approvedIds.add(oid);
+                  }
                 }
-                return false;
-              }).length
+                return all.where((m) {
+                  if (m['type'] == 'order_approved') return true;
+                  if (m['type'] == 'new_order') {
+                    final rd = m['read'];
+                    final oid = m['orderId']?.toString() ?? '';
+                    // Don't count stale new_order once the manager already approved.
+                    if (oid.isNotEmpty && approvedIds.contains(oid)) return false;
+                    return rd != true && rd != 'true';
+                  }
+                  return false;
+                }).length;
+              }()
             : 0;
         setState(() {
           _pendingOrdersCount = _parseCount(results[0]);

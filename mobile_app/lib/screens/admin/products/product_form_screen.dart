@@ -132,8 +132,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
           _imageUrl = null;
         });
       } else if (mounted) {
+        final l10n = AppLocalizations.of(context)!;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not read image data. Try another file.')),
+          SnackBar(content: Text(l10n.couldNotReadImage)),
         );
       }
     } catch (e) {

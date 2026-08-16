@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
 import '../services/api_service.dart';
 import '../services/token_storage.dart';
+import '../utils/roles.dart';
 
 class AuthProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
@@ -14,7 +15,21 @@ class AuthProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get isAuthenticated => _user != null;
-  bool get isAdmin => _user?.role == 'admin';
+  bool get isAdmin => isAdminRole(_user?.role);
+  bool get isManager => isManagerRole(_user?.role);
+  bool get isAdminLike => isAdminLikeRole(_user?.role);
+  bool get isSupervisor => isSupervisorRole(_user?.role);
+  bool get isFinance => isFinanceRole(_user?.role);
+
+  // Aliases to avoid clash with top-level imports in getters
+  static bool isAdminRole(String? r) => normalizeRole(r) == 'admin';
+  static bool isManagerRole(String? r) => normalizeRole(r) == 'manager';
+  static bool isAdminLikeRole(String? r) {
+    final n = normalizeRole(r);
+    return n == 'admin' || n == 'manager';
+  }
+  static bool isSupervisorRole(String? r) => normalizeRole(r) == 'supervisor';
+  static bool isFinanceRole(String? r) => normalizeRole(r) == 'finance';
 
   Future<bool> login(String email, String password) async {
     _isLoading = true;

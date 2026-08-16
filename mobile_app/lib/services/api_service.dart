@@ -70,7 +70,7 @@ class ApiService {
         Uri.parse('$baseUrl$endpoint'),
         headers: await _getHeaders(),
         body: jsonEncode(data),
-      );
+      ).timeout(const Duration(seconds: 20));
 
       return await _handleResponse(response);
     } catch (e) {
@@ -93,7 +93,7 @@ class ApiService {
         fileBytes,
         filename: filename,
       ));
-      final streamed = await request.send();
+      final streamed = await request.send().timeout(const Duration(seconds: 60));
       final response = await http.Response.fromStream(streamed);
       return await _handleResponse(response);
     } catch (e) {
@@ -107,7 +107,7 @@ class ApiService {
       final response = await http.delete(
         Uri.parse('$baseUrl$endpoint'),
         headers: await _getHeaders(),
-      );
+      ).timeout(const Duration(seconds: 20));
 
       return await _handleResponse(response);
     } catch (e) {
@@ -118,10 +118,23 @@ class ApiService {
   static String traduireMessage(String msg) {
     final m = msg.replaceAll('Exception: ', '');
     final ml = m.toLowerCase();
-    if (m.contains('TimeoutException') || m.contains('Connection timed out')) {
-      return 'Unable to reach the server. Run start.bat to start the backend automatically.';
-    }
-    if (m.contains('Network error') || m.contains('Failed to fetch') || m.contains('Failed host lookup') || m.contains('Connection refused') || m.contains('SocketException')) {
+    final isNetwork = m.contains('TimeoutException') ||
+        m.contains('Connection timed out') ||
+        m.contains('Network error') ||
+        m.contains('Failed to fetch') ||
+        m.contains('Failed host lookup') ||
+        m.contains('Connection refused') ||
+        m.contains('SocketException') ||
+        m.contains('ClientException') ||
+        m.contains('HandshakeException') ||
+        m.contains('CERTIFICATE') ||
+        m.contains('HTML instead of JSON') ||
+        m.contains('Invalid server response');
+    if (isNetwork) {
+      // Production build: never mention start.bat — API is remote.
+      if (apiBaseUrlOverride != null && apiBaseUrlOverride!.isNotEmpty) {
+        return 'Unable to reach the server ($apiBaseUrlOverride). Check internet and try again. App must be version 1.0.5 or newer.';
+      }
       return 'Unable to reach the server. Run start.bat to start the backend automatically.';
     }
     if (m.contains('Invalid credentials')) return 'Invalid credentials.';
@@ -143,12 +156,14 @@ class ApiService {
     if (m.contains('Store name already exists') || m.contains('Project name already exists')) return 'This name already exists.';
     if (m.contains('Please provide')) return 'Please fill in all required fields.';
     if (m.contains('Not found')) return 'Not found.';
-    if (m.contains('Route not found')) return 'API route not found. Run start.bat to start the backend.';
+    if (m.contains('Route not found')) {
+      if (apiBaseUrlOverride != null && apiBaseUrlOverride!.isNotEmpty) {
+        return 'API route missing on server. Deploy the latest backend to production and restart it.';
+      }
+      return 'API route not found. Run start.bat to start the backend.';
+    }
     if (m.contains('An error occurred')) return 'An error occurred.';
     if (m.contains('exceeds allowed quantity')) return _supplementaryQtyApprovalMessage();
-    if (m.contains('HTML instead of JSON') || m.contains('Invalid server response')) {
-      return 'Unable to reach the server. Run start.bat to start the backend automatically.';
-    }
     return m;
   }
 

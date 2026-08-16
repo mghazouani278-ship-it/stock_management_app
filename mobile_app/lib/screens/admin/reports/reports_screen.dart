@@ -1,29 +1,58 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../providers/auth_provider.dart';
 import '../../../theme/app_theme.dart';
+import '../../../utils/roles.dart';
 import '../../../widgets/app_search_bar.dart';
 import '../../../widgets/menu_card.dart';
 import 'report_detail_screen.dart';
 import 'report_type_l10n.dart';
+import 'mrp_report_screen.dart';
 
 enum ReportType {
-  distributions('distributions', Icons.local_shipping_rounded),
+  distributions('distributions', Icons.move_to_inbox_rounded),
   orders('orders', Icons.shopping_cart_rounded),
   returns('returns', Icons.undo_rounded),
   damagedProducts('damaged-products', Icons.warning_amber_rounded),
   stockHistory('stock-history', Icons.history_rounded),
   /// Liste via `/projects` (pas `/reports/...`).
-  projects('projects', Icons.folder_special_rounded);
+  projects('projects', Icons.folder_special_rounded),
+  /// Procurement Planning — dedicated screen.
+  mrp('mrp', Icons.analytics_outlined);
 
   final String endpoint;
   final IconData icon;
   const ReportType(this.endpoint, this.icon);
 }
 
+/// Reports visible for each role.
+List<ReportType> reportTypesForRole(String? role) {
+  final r = normalizeRole(role);
+  if (r == 'finance') {
+    return const [ReportType.mrp];
+  }
+  if (r == 'supervisor') {
+    return const [ReportType.distributions];
+  }
+  if (isWarehouseLike(r)) {
+    return const [
+      ReportType.mrp,
+      ReportType.distributions,
+      ReportType.stockHistory,
+      ReportType.projects,
+    ];
+  }
+  // admin / manager — all
+  return ReportType.values;
+}
+
 class ReportsScreen extends StatefulWidget {
   final bool allowDelete;
+  /// If set, only these types are shown (overrides role filter).
+  final List<ReportType>? onlyTypes;
 
-  const ReportsScreen({super.key, this.allowDelete = true});
+  const ReportsScreen({super.key, this.allowDelete = true, this.onlyTypes});
 
   @override
   State<ReportsScreen> createState() => _ReportsScreenState();
@@ -45,10 +74,17 @@ class _ReportsScreenState extends State<ReportsScreen> {
     super.dispose();
   }
 
-  List<ReportType> _filteredTypes(AppLocalizations l10n) {
+  List<ReportType> _allowedTypes(BuildContext context) {
+    if (widget.onlyTypes != null) return widget.onlyTypes!;
+    final role = Provider.of<AuthProvider>(context, listen: false).user?.role;
+    return reportTypesForRole(role);
+  }
+
+  List<ReportType> _filteredTypes(BuildContext context, AppLocalizations l10n) {
+    final base = _allowedTypes(context);
     final q = _searchController.text.trim().toLowerCase();
-    if (q.isEmpty) return ReportType.values;
-    return ReportType.values.where((t) {
+    if (q.isEmpty) return base;
+    return base.where((t) {
       final full = t.titleFull(l10n).toLowerCase();
       final menu = t.titleMenu(l10n).toLowerCase().replaceAll('\n', ' ');
       return full.contains(q) || menu.contains(q);
@@ -61,12 +97,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
     Color(0xFFF59E0B),
     Color(0xFFEF4444),
     Color(0xFF06B6D4),
+    Color(0xFF8B5CF6),
+    Color(0xFF0EA5E9),
   ];
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final types = _filteredTypes(l10n);
+    final types = _filteredTypes(context, l10n);
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
@@ -129,7 +167,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
                       onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => ReportDetailScreen(reportType: type, allowDelete: widget.allowDelete),
+                          builder: (_) => type == ReportType.mrp
+                              ? const MrpReportScreen()
+                              : ReportDetailScreen(reportType: type, allowDelete: widget.allowDelete),
                         ),
                       ),
                       transparent: true,

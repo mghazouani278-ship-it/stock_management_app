@@ -1,13 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../models/damaged_product.dart';
+import '../../../models/product.dart';
+import '../../../models/user.dart';
+import '../../../providers/auth_provider.dart';
 import '../../../services/api_service.dart';
 import '../../../theme/app_theme.dart';
+import '../../../utils/roles.dart';
 import '../../../widgets/connection_error_widget.dart';
 import '../../../widgets/app_card.dart';
 import '../../../utils/l10n_ui_helpers.dart';
-import '../../../utils/store_localized.dart';
 import '../../../utils/product_localized.dart';
+import '../../../utils/project_localized.dart';
+import '../../../utils/store_localized.dart';
 
 class DamagedProductsListScreen extends StatefulWidget {
   const DamagedProductsListScreen({super.key});
@@ -20,9 +26,12 @@ class _DamagedProductsListScreenState extends State<DamagedProductsListScreen> {
   final ApiService _apiService = ApiService();
   final _searchController = TextEditingController();
   List<DamagedProduct> _items = [];
+  List<Project> _projects = [];
   bool _loading = true;
   String? _error;
   bool _searchVisible = false;
+
+  bool get _isSupervisor => isSupervisor(context.read<AuthProvider>().user?.role);
 
   @override
   void initState() {
@@ -44,12 +53,10 @@ class _DamagedProductsListScreenState extends State<DamagedProductsListScreen> {
       final matchProduct = productNameMatchesSearchQuery(i.product?.name, null, q);
       final matchProject = (i.project?.name.toLowerCase().contains(q) ?? false) ||
           (i.project?.nameAr?.toLowerCase().contains(q) ?? false);
-      final matchStore = (i.store?.name.toLowerCase().contains(q) ?? false) ||
-          (i.store?.nameAr?.toLowerCase().contains(q) ?? false);
       final matchReason = i.reason.toLowerCase().contains(q);
       final matchStatus = i.status.toLowerCase().contains(q);
       final matchNotes = i.notes?.toLowerCase().contains(q) ?? false;
-      return matchProduct || matchProject || matchStore || matchReason || matchStatus || matchNotes;
+      return matchProduct || matchProject || matchReason || matchStatus || matchNotes;
     }).toList();
   }
 
@@ -75,6 +82,222 @@ class _DamagedProductsListScreenState extends State<DamagedProductsListScreen> {
         _loading = false;
         _error = e.toString().replaceAll('Exception: ', '');
       });
+    }
+  }
+
+  Future<void> _ensureLookups() async {
+    if (_projects.isNotEmpty) return;
+    final user = context.read<AuthProvider>().user;
+    final res = await _apiService.get('/projects', queryParams: {'light': 'true', 'products': 'true'});
+    if (res['success'] == true && res['data'] is List) {
+      var projects = (res['data'] as List)
+          .map((e) => Project.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList();
+      if (isSupervisor(user?.role)) {
+        final allowed = user?.projectIds.toSet() ?? {};
+        if (allowed.isNotEmpty) {
+          projects = projects.where((p) => allowed.contains(p.id)).toList();
+        }
+      } else if (isUserRole(user?.role) && user?.project != null) {
+        projects = projects.where((p) => p.id == user!.project!.id).toList();
+        if (projects.isEmpty) projects = [user!.project!];
+      }
+      _projects = projects;
+    }
+  }
+
+  List<Product> _productsForProject(Project? project) {
+    if (project?.products == null) return const [];
+    final seen = <String>{};
+    final out = <Product>[];
+    for (final pp in project!.products!) {
+      final id = pp.product;
+      if (id.isEmpty || seen.contains(id)) continue;
+      seen.add(id);
+      out.add(Product(
+        id: id,
+        name: (pp.productName != null && pp.productName!.trim().isNotEmpty) ? pp.productName! : id,
+        category: const [],
+        unit: 'pcs',
+        status: 'active',
+      ));
+    }
+    return out;
+  }
+
+  Future<void> _showAddForm() async {
+    final l10n = AppLocalizations.of(context)!;
+    try {
+      await _ensureLookups();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceAll('Exception: ', '')), backgroundColor: Colors.red),
+      );
+      return;
+    }
+    if (!mounted) return;
+    if (_projects.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.addProductsStoresFirst)),
+      );
+      return;
+    }
+
+    String? projectId = _projects.first.id;
+    var products = _productsForProject(_projects.first);
+    if (products.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.addProductsStoresFirst)),
+      );
+      return;
+    }
+    String? productId = products.first.id;
+    // Damaged or not damaged (good)
+    String condition = 'damaged';
+    final qtyController = TextEditingController(text: '1');
+    final notesController = TextEditingController();
+
+    final added = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setD) {
+          final dlgL10n = AppLocalizations.of(ctx)!;
+          return AlertDialog(
+            title: Text(dlgL10n.addDamagedProduct),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_projects.length > 1 || _isSupervisor) ...[
+                    DropdownButtonFormField<String>(
+                      value: projectId,
+                      decoration: InputDecoration(
+                        labelText: '${dlgL10n.project} *',
+                        border: const OutlineInputBorder(),
+                      ),
+                      items: _projects
+                          .map(
+                            (p) => DropdownMenuItem(
+                              value: p.id,
+                              child: Text(p.displayName(ctx)),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (v) {
+                        setD(() {
+                          projectId = v;
+                          Project? proj;
+                          for (final p in _projects) {
+                            if (p.id == v) {
+                              proj = p;
+                              break;
+                            }
+                          }
+                          products = _productsForProject(proj);
+                          productId = products.isNotEmpty ? products.first.id : null;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  DropdownButtonFormField<String>(
+                    value: productId,
+                    decoration: InputDecoration(
+                      labelText: '${dlgL10n.product} *',
+                      border: const OutlineInputBorder(),
+                    ),
+                    items: products
+                        .map(
+                          (p) => DropdownMenuItem(
+                            value: p.id,
+                            child: Text(p.displayName(ctx)),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) => setD(() => productId = v),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    value: condition,
+                    decoration: InputDecoration(
+                      labelText: dlgL10n.conditionLabel,
+                      border: const OutlineInputBorder(),
+                    ),
+                    items: [
+                      DropdownMenuItem(
+                        value: 'damaged',
+                        child: Text(dlgL10n.damagedCondition),
+                      ),
+                      DropdownMenuItem(
+                        value: 'good',
+                        child: Text(dlgL10n.goodCondition),
+                      ),
+                    ],
+                    onChanged: (v) => setD(() => condition = v ?? 'damaged'),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: qtyController,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: '${dlgL10n.quantity} *',
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: notesController,
+                    decoration: InputDecoration(
+                      labelText: dlgL10n.notesOptional,
+                      border: const OutlineInputBorder(),
+                    ),
+                    maxLines: 2,
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(dlgL10n.cancel)),
+              FilledButton(
+                onPressed: () {
+                  if (productId != null &&
+                      projectId != null &&
+                      (int.tryParse(qtyController.text) ?? 0) > 0) {
+                    Navigator.pop(ctx, true);
+                  }
+                },
+                child: Text(dlgL10n.add),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    if (added != true || !mounted) return;
+    final reason = condition == 'good' ? 'Good condition' : 'Returned as damaged';
+    try {
+      await _apiService.post('/damaged-products', {
+        'product': productId,
+        'projectId': projectId,
+        'quantity': int.parse(qtyController.text),
+        'reason': reason,
+        'notes': notesController.text.trim().isEmpty ? null : notesController.text.trim(),
+      });
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.damagedProductAdded), backgroundColor: Colors.green),
+      );
+      await _loadDamagedProducts();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceAll('Exception: ', '')),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -124,14 +347,6 @@ class _DamagedProductsListScreenState extends State<DamagedProductsListScreen> {
                   padding: const EdgeInsets.only(top: 4),
                   child: Text('${l10n.reasonLabel} ${localizedDamageReason(context, item.reason)}', style: AppTheme.appTextStyle(context, color: AppTheme.textPrimary)),
                 ),
-                if (item.store != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(
-                      '${l10n.storeLabel} ${item.store!.displayName(context)}',
-                      style: AppTheme.appTextStyle(context, color: AppTheme.textPrimary),
-                    ),
-                  ),
                 if (item.project != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
@@ -211,6 +426,10 @@ class _DamagedProductsListScreenState extends State<DamagedProductsListScreen> {
         ],
       ),
       body: _buildBody(),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showAddForm,
+        child: const Icon(Icons.add_rounded),
+      ),
     );
   }
 
@@ -300,6 +519,13 @@ class _DamagedProductsListScreenState extends State<DamagedProductsListScreen> {
                           ),
                           style: AppTheme.appTextStyle(context, fontSize: 13, color: AppTheme.textSecondary),
                         ),
+                        if (item.project != null) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            item.project!.displayName(context),
+                            style: AppTheme.appTextStyle(context, fontSize: 12, color: AppTheme.textTertiary),
+                          ),
+                        ],
                       ],
                     ),
                   ),

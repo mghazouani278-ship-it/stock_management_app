@@ -2,8 +2,8 @@ const express = require('express');
 const router = express.Router();
 const { getFirestore } = require('../firebase');
 const { admin } = require('../firebase');
-const { protect, authorize, checkProjectAccess } = require('../middleware/auth');
-const { extractBoqDate } = require('../utils/projectProductsMap');
+const {protect, authorize, checkProjectAccess, authorizeAdminLike} = require('../middleware/auth');
+const { extractBoqDate, parseProjectProductQty, setProjectMapQty } = require('../utils/projectProductsMap');
 
 function parseProductKey(key) {
   const idx = key.indexOf(':');
@@ -75,7 +75,68 @@ function historyActor(req) {
     id: req.user?.id || null,
     name: req.user?.name || null,
     email: req.user?.email || null,
+    role: req.user?.role || null,
   };
+}
+
+/** Build product map entry preserving boq_date when present. */
+function productMapEntry(qty, boqDate, prevRaw) {
+  const q = Math.max(0, Math.floor(Number(qty)) || 0);
+  const boq = (boqDate || extractBoqDate(prevRaw) || '').toString().trim();
+  if (boq) return { allowed_quantity: q, boq_date: boq };
+  return setProjectMapQty(prevRaw, q);
+}
+
+/**
+ * Apply admin product list: quantityToAdd increases remaining + total requested.
+ * Keys omitted from the list are removed.
+ * Returns { productsMap, productsRequestedMap, qtyEvents }.
+ */
+function applyAdminProductAdds(oldProducts, oldRequested, productsArray) {
+  const productsMap = {};
+  const productsRequestedMap = {};
+  const qtyEvents = [];
+  if (!Array.isArray(productsArray)) {
+    return { productsMap: oldProducts || {}, productsRequestedMap: oldRequested || oldProducts || {}, qtyEvents };
+  }
+  for (const p of productsArray) {
+    const pid = p.product?.id ?? p.product?._id ?? p.product;
+    if (!pid) continue;
+    const color = p.color ? String(p.color).trim().toLowerCase() : null;
+    const key = makeProductKey(pid, color);
+    const boq = (p.boqDate ?? p.boq_date ?? '').toString().trim();
+    const prevRemRaw = (oldProducts || {})[key];
+    const prevReqRaw = (oldRequested || {})[key] ?? prevRemRaw;
+    const prevRem = parseProjectProductQty(prevRemRaw);
+    const prevReq = parseProjectProductQty(prevReqRaw);
+
+    let addQty = p.quantityToAdd ?? p.quantity_to_add;
+    if (addQty === undefined || addQty === null || addQty === '') {
+      // Legacy absolute remaining (old clients): treat as initial set only when key is new.
+      const absolute = Math.max(0, Math.floor(Number(p.allowedQuantity ?? p.allowed_quantity ?? 0)) || 0);
+      addQty = prevRemRaw === undefined ? absolute : 0;
+    } else {
+      addQty = Math.max(0, Math.floor(Number(addQty)) || 0);
+    }
+
+    const newRem = prevRem + addQty;
+    const newReq = prevReq + addQty;
+    productsMap[key] = productMapEntry(newRem, boq, prevRemRaw);
+    productsRequestedMap[key] = productMapEntry(newReq, boq, prevReqRaw);
+
+    if (addQty > 0) {
+      qtyEvents.push({
+        action: 'qty_add',
+        productId: String(pid),
+        color: color || null,
+        quantityAdded: addQty,
+        quantityOrdered: 0,
+        remainingAfter: newRem,
+        requestedTotalAfter: newReq,
+      });
+    }
+  }
+  return { productsMap, productsRequestedMap, qtyEvents };
 }
 
 /** ISO string for JSON (Firestore Timestamp, Date, or string). */
@@ -117,9 +178,11 @@ async function loadDistributedMapsForProject(firestore, projectId) {
   for (const d of distSnap.docs) {
     const distData = d.data();
     for (const p of (distData.products || [])) {
-      const pid = p.product?.id ?? p.product?._id ?? p.product;
+      // Attribute BOQ / distributed totals to the originally requested product when replaced.
+      const pid = p.original_product_id ?? p.originalProductId ?? p.product?.id ?? p.product?._id ?? p.product;
       if (!pid) continue;
-      const pColor = p.color ? String(p.color).trim().toLowerCase() : null;
+      const pColorRaw = p.original_color ?? p.originalColor ?? p.color;
+      const pColor = pColorRaw ? String(pColorRaw).trim().toLowerCase() : null;
       const qty = parseQtyField(p.quantity);
       if (qty <= 0) continue;
       distributedByProduct[pid] = (distributedByProduct[pid] ?? 0) + qty;
@@ -199,12 +262,15 @@ async function projectToApi(doc, firestore) {
     const productKey = makeProductKey(productId, color);
     const supplementaryQuantity = (supplementaryByKey[productKey] ?? supplementaryByProduct[productId] ?? 0);
     const distributedQuantity = (distributedByKey[productKey] ?? distributedByProduct[productId] ?? 0);
+    const remainingQuantity = allowedQuantity;
     const item = {
       product: prodDoc.exists
         ? { id: productId, name: prodDoc.data().name, category: prodDoc.data().category, unit: prodDoc.data().unit }
         : { id: productId },
       allowedQuantity,
+      remainingQuantity,
       requestedQuantity: requestedQuantity > 0 ? requestedQuantity : allowedQuantity,
+      qtyAddedByAdmin: requestedQuantity > 0 ? requestedQuantity : allowedQuantity,
       supplementaryQuantity,
       distributedQuantity,
     };
@@ -220,6 +286,12 @@ async function projectToApi(doc, firestore) {
         by: h?.by || null,
         changes: Array.isArray(h?.changes) ? h.changes : [],
         snapshot: h?.snapshot && typeof h.snapshot === 'object' ? h.snapshot : null,
+        productId: h?.productId || null,
+        color: h?.color || null,
+        quantityAdded: h?.quantityAdded ?? null,
+        quantityOrdered: h?.quantityOrdered ?? null,
+        remainingAfter: h?.remainingAfter ?? null,
+        requestedTotalAfter: h?.requestedTotalAfter ?? null,
       }))
     : [];
   return {
@@ -245,7 +317,27 @@ function _normalizeRole(role) {
   return (role || '').toLowerCase().replace(/\s+/g, '_');
 }
 
-/** Lightweight: id, name, products; includes distributedQuantity from distributions (same as full API). */
+/** Lightweight: id, name, status, owner — no products / distributions (fast lists & filters). */
+function projectToApiSummary(doc) {
+  if (!doc || !doc.exists) return null;
+  const data = doc.data();
+  return {
+    id: doc.id,
+    name: data.name,
+    nameAr: data.name_ar || null,
+    description: data.description || null,
+    status: data.status || 'active',
+    projectOwner: data.project_owner || null,
+    projectOwnerAr: data.project_owner_ar || null,
+    depotId: data.depot_id || null,
+    boqCreationDate: data.boq_creation_date || null,
+    createdAt: firestoreTimestampToIso(data.created_at),
+    updatedAt: firestoreTimestampToIso(data.updated_at),
+    products: [],
+  };
+}
+
+/** Lightweight with products + distributed qty (forms that need BOQ). */
 async function projectToApiLite(doc, productCache, firestore) {
   if (!doc || !doc.exists) return null;
   const data = doc.data();
@@ -257,7 +349,7 @@ async function projectToApiLite(doc, productCache, firestore) {
     const { productId, color } = parseProductKey(key);
     const rawRequested = productsRequestedMap[key] ?? rawAllowed;
     const requestedQuantity = parseQtyField(rawRequested);
-    if (requestedQuantity <= 0) continue;
+    if (requestedQuantity <= 0 && parseQtyField(rawAllowed) <= 0) continue;
     const allowedQuantity = parseQtyField(rawAllowed);
     const prod = productCache.get(productId);
     const productKey = makeProductKey(productId, color);
@@ -265,7 +357,9 @@ async function projectToApiLite(doc, productCache, firestore) {
     const lite = {
       product: prod ? { id: productId, name: prod.name } : { id: productId },
       allowedQuantity,
+      remainingQuantity: allowedQuantity,
       requestedQuantity,
+      qtyAddedByAdmin: requestedQuantity,
       supplementaryQuantity: 0,
       distributedQuantity,
       ...(color ? { color } : {}),
@@ -295,16 +389,33 @@ router.get('/', protect, async (req, res) => {
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
     const firestore = getFirestore();
     const light = req.query.light === '1' || req.query.light === 'true';
-    if (_normalizeRole(req.user.role) === 'user') {
-      if (!req.user.project_id) return res.json({ success: true, count: 0, data: [] });
-      const doc = await firestore.collection('projects').doc(req.user.project_id).get();
-      if (!doc.exists) return res.json({ success: true, count: 0, data: [] });
-      const data = light
-        ? await projectToApiLite(doc, await _buildProductCache([doc], firestore), firestore)
-        : await projectToApi(doc, firestore);
-      return res.json({ success: true, count: 1, data: [data] });
+    const withProducts = req.query.products === '1' || req.query.products === 'true';
+    if (_normalizeRole(req.user.role) === 'user' || _normalizeRole(req.user.role) === 'supervisor') {
+      const ids = (req.user.project_ids || []).map(String);
+      if (ids.length === 0 && req.user.project_id) ids.push(String(req.user.project_id));
+      if (ids.length === 0) return res.json({ success: true, count: 0, data: [] });
+      const docs = [];
+      for (const pid of ids) {
+        const doc = await firestore.collection('projects').doc(pid).get();
+        if (doc.exists) docs.push(doc);
+      }
+      if (light && !withProducts) {
+        const data = docs.map(projectToApiSummary).filter(Boolean);
+        return res.json({ success: true, count: data.length, data });
+      }
+      if (light) {
+        const productCache = await _buildProductCache(docs, firestore);
+        const data = (await Promise.all(docs.map((d) => projectToApiLite(d, productCache, firestore)))).filter(Boolean);
+        return res.json({ success: true, count: data.length, data });
+      }
+      const data = await Promise.all(docs.map((d) => projectToApi(d, firestore)));
+      return res.json({ success: true, count: data.length, data });
     }
     const snapshot = await firestore.collection('projects').orderBy('created_at', 'desc').get();
+    if (light && !withProducts) {
+      const data = snapshot.docs.map(projectToApiSummary).filter(Boolean);
+      return res.json({ success: true, count: data.length, data });
+    }
     if (light) {
       const productCache = await _buildProductCache(snapshot.docs, firestore);
       const data = (await Promise.all(snapshot.docs.map((d) => projectToApiLite(d, productCache, firestore)))).filter(Boolean);
@@ -356,7 +467,7 @@ router.get('/:id', protect, checkProjectAccess, async (req, res) => {
   }
 });
 
-router.post('/', protect, authorize('admin'), async (req, res) => {
+router.post('/', protect, authorizeAdminLike, async (req, res) => {
   try {
     const { name, nameAr, description, images1, products, projectOwner, projectOwnerAr, boqCreationDate, boq_creation_date, depotId } = req.body;
     if (!name) return res.status(400).json({ success: false, message: 'Please provide a project name' });
@@ -365,18 +476,16 @@ router.post('/', protect, authorize('admin'), async (req, res) => {
     const existing = await firestore.collection('projects').where('name', '==', name.trim()).limit(1).get();
     if (!existing.empty) return res.status(400).json({ success: false, message: 'Project name already exists' });
     const productsMap = {};
+    const productsRequestedMap = {};
+    const qtyEvents = [];
     if (products && Array.isArray(products)) {
-      for (const p of products) {
-        const pid = p.product?.id ?? p.product?._id ?? p.product;
-        const qty = p.allowedQuantity ?? p.allowed_quantity ?? 0;
-        const color = p.color ? String(p.color).trim().toLowerCase() : null;
-        const q = Math.max(0, Math.floor(Number(qty)) || 0);
-        const boq = (p.boqDate ?? p.boq_date ?? '').toString().trim();
-        if (!pid) continue;
-        const key = makeProductKey(pid, color);
-        if (boq) productsMap[key] = { allowed_quantity: q, boq_date: boq };
-        else productsMap[key] = q;
-      }
+      const applied = applyAdminProductAdds({}, {}, products.map((p) => ({
+        ...p,
+        quantityToAdd: p.quantityToAdd ?? p.quantity_to_add ?? p.allowedQuantity ?? p.allowed_quantity ?? 0,
+      })));
+      Object.assign(productsMap, applied.productsMap);
+      Object.assign(productsRequestedMap, applied.productsRequestedMap);
+      qtyEvents.push(...applied.qtyEvents);
     }
     const nameArTrim = nameAr != null && String(nameAr).trim() !== '' ? String(nameAr).trim() : null;
     const projectDocData = {
@@ -389,23 +498,29 @@ router.post('/', protect, authorize('admin'), async (req, res) => {
       project_owner_ar: projectOwnerAr != null && String(projectOwnerAr).trim() !== '' ? String(projectOwnerAr).trim() : null,
       boq_creation_date: boqCreationNorm,
       products: productsMap,
-      products_requested: { ...productsMap },
+      products_requested: productsRequestedMap,
     };
     if (depotId != null && String(depotId).trim() !== '') {
       projectDocData.depot_id = String(depotId).trim();
     }
+    const historyEntries = [
+      {
+        action: 'created',
+        at: admin.firestore.Timestamp.now(),
+        by: historyActor(req),
+        changes: ['project'],
+        snapshot: buildHistorySnapshot(projectDocData),
+      },
+      ...qtyEvents.map((e) => ({
+        ...e,
+        at: admin.firestore.Timestamp.now(),
+        by: historyActor(req),
+        changes: ['products'],
+      })),
+    ];
     const ref = await firestore.collection('projects').add({
       ...projectDocData,
-      history: [
-        {
-          action: 'created',
-          // Firestore forbids FieldValue.serverTimestamp() inside array elements; use Timestamp.
-          at: admin.firestore.Timestamp.now(),
-          by: historyActor(req),
-          changes: ['project'],
-          snapshot: buildHistorySnapshot(projectDocData),
-        },
-      ],
+      history: historyEntries,
       created_at: admin.firestore.FieldValue.serverTimestamp(),
       updated_at: admin.firestore.FieldValue.serverTimestamp(),
     });
@@ -417,7 +532,7 @@ router.post('/', protect, authorize('admin'), async (req, res) => {
   }
 });
 
-router.put('/:id', protect, authorize('admin'), async (req, res) => {
+router.put('/:id', protect, authorizeAdminLike, async (req, res) => {
   try {
     const { name, nameAr, description, images1, status, products, projectOwner, projectOwnerAr, boqCreationDate, boq_creation_date, depotId } = req.body;
     const firestore = getFirestore();
@@ -447,33 +562,34 @@ router.put('/:id', protect, authorize('admin'), async (req, res) => {
     if (depotId !== undefined) {
       updates.depot_id = depotId != null && String(depotId).trim() !== '' ? String(depotId).trim() : null;
     }
+    const historyToAppend = [];
     if (products && Array.isArray(products)) {
-      const productsMap = {};
-      for (const p of products) {
-        const pid = p.product?.id ?? p.product?._id ?? p.product;
-        const qty = p.allowedQuantity ?? p.allowed_quantity ?? 0;
-        const color = p.color ? String(p.color).trim().toLowerCase() : null;
-        const q = Math.max(0, Math.floor(Number(qty)) || 0);
-        const boq = (p.boqDate ?? p.boq_date ?? '').toString().trim();
-        if (!pid) continue;
-        const key = makeProductKey(pid, color);
-        if (boq) productsMap[key] = { allowed_quantity: q, boq_date: boq };
-        else productsMap[key] = q;
+      const oldProducts = doc.data().products || {};
+      const oldRequested = doc.data().products_requested || oldProducts;
+      const applied = applyAdminProductAdds(oldProducts, oldRequested, products);
+      updates.products = applied.productsMap;
+      updates.products_requested = applied.productsRequestedMap;
+      for (const e of applied.qtyEvents) {
+        historyToAppend.push({
+          ...e,
+          at: admin.firestore.Timestamp.now(),
+          by: historyActor(req),
+          changes: ['products'],
+        });
       }
-      updates.products = productsMap;
-      updates.products_requested = { ...productsMap };
     }
     const beforeComparable = projectComparableData(doc.data() || {});
     const mergedAfter = { ...(doc.data() || {}), ...updates };
     const afterComparable = projectComparableData(mergedAfter);
     const changes = projectChangesList(beforeComparable, afterComparable);
-    updates.history = admin.firestore.FieldValue.arrayUnion({
+    historyToAppend.push({
       action: 'updated',
       at: admin.firestore.Timestamp.now(),
       by: historyActor(req),
       changes: changes.length ? changes : ['project'],
       snapshot: buildHistorySnapshot(mergedAfter),
     });
+    updates.history = admin.firestore.FieldValue.arrayUnion(...historyToAppend);
     await ref.update(updates);
     const updated = await ref.get();
     const data = await projectToApi(updated, firestore);
@@ -483,7 +599,7 @@ router.put('/:id', protect, authorize('admin'), async (req, res) => {
   }
 });
 
-router.delete('/:id', protect, authorize('admin'), async (req, res) => {
+router.delete('/:id', protect, authorizeAdminLike, async (req, res) => {
   try {
     const firestore = getFirestore();
     const ref = firestore.collection('projects').doc(req.params.id);
@@ -500,7 +616,7 @@ router.delete('/:id', protect, authorize('admin'), async (req, res) => {
   }
 });
 
-router.post('/:id/assign-user', protect, authorize('admin'), async (req, res) => {
+router.post('/:id/assign-user', protect, authorizeAdminLike, async (req, res) => {
   try {
     const { userId } = req.body;
     if (!userId) return res.status(400).json({ success: false, message: 'Please provide user ID' });
@@ -522,17 +638,44 @@ router.post('/:id/assign-user', protect, authorize('admin'), async (req, res) =>
   }
 });
 
-router.post('/:id/assign-product', protect, authorize('admin'), async (req, res) => {
+router.post('/:id/assign-product', protect, authorizeAdminLike, async (req, res) => {
   try {
-    const { productId, allowedQuantity } = req.body;
-    if (!productId || allowedQuantity === undefined) return res.status(400).json({ success: false, message: 'Please provide product ID and allowed quantity' });
+    const { productId, allowedQuantity, quantityToAdd, color } = req.body;
+    const addQty = quantityToAdd ?? allowedQuantity;
+    if (!productId || addQty === undefined) {
+      return res.status(400).json({ success: false, message: 'Please provide product ID and quantity to add' });
+    }
     const firestore = getFirestore();
     const ref = firestore.collection('projects').doc(req.params.id);
     const doc = await ref.get();
     if (!doc.exists) return res.status(404).json({ success: false, message: 'Project not found' });
-    const products = { ...(doc.data().products || {}), [productId]: allowedQuantity };
-    const productsRequested = { ...(doc.data().products_requested || doc.data().products || {}), [productId]: allowedQuantity };
-    await ref.update({ products, products_requested: productsRequested, updated_at: admin.firestore.FieldValue.serverTimestamp() });
+    const colorNorm = color ? String(color).trim().toLowerCase() : null;
+    const applied = applyAdminProductAdds(
+      doc.data().products || {},
+      doc.data().products_requested || doc.data().products || {},
+      [{ product: productId, color: colorNorm, quantityToAdd: addQty }],
+    );
+    // Keep other existing product keys (applyAdminProductAdds rebuilds only from list).
+    const products = { ...(doc.data().products || {}), ...applied.productsMap };
+    const productsRequested = {
+      ...(doc.data().products_requested || doc.data().products || {}),
+      ...applied.productsRequestedMap,
+    };
+    const historyEntries = applied.qtyEvents.map((e) => ({
+      ...e,
+      at: admin.firestore.Timestamp.now(),
+      by: historyActor(req),
+      changes: ['products'],
+    }));
+    const updatePayload = {
+      products,
+      products_requested: productsRequested,
+      updated_at: admin.firestore.FieldValue.serverTimestamp(),
+    };
+    if (historyEntries.length) {
+      updatePayload.history = admin.firestore.FieldValue.arrayUnion(...historyEntries);
+    }
+    await ref.update(updatePayload);
     const updated = await ref.get();
     const data = await projectToApi(updated, firestore);
     res.json({ success: true, data });

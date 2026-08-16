@@ -27,3 +27,34 @@ Stock? findStockForOrderLine(List<Stock> stocks, String productId, String? color
   }
   return best;
 }
+
+/// Total available quantity across stores for this product (+ optional color).
+num stockQuantityForOrderLine(List<Stock> stocks, String productId, String? color) {
+  num sum = 0;
+  final want = _normColor(color);
+  for (final s in stocks) {
+    final pid = (s.documentProductId ?? s.product?.id ?? '').trim();
+    if (pid != productId) continue;
+    final have = _normColor(s.variant);
+    if (want.isEmpty) {
+      if (have.isEmpty) sum += s.quantity;
+    } else if (have == want) {
+      sum += s.quantity;
+    }
+  }
+  if (want.isNotEmpty && sum == 0) {
+    for (final s in stocks) {
+      final pid = (s.documentProductId ?? s.product?.id ?? '').trim();
+      if (pid != productId) continue;
+      if (_normColor(s.variant).isEmpty) sum += s.quantity;
+    }
+  }
+  if (want.isEmpty && sum == 0) {
+    for (final s in stocks) {
+      final pid = (s.documentProductId ?? s.product?.id ?? '').trim();
+      if (pid != productId) continue;
+      sum += s.quantity;
+    }
+  }
+  return sum;
+}

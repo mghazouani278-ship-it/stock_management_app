@@ -3,11 +3,12 @@ const router = express.Router();
 const { getFirestore } = require('../firebase');
 const { admin } = require('../firebase');
 const updateStock = require('../utils/updateStock');
-const { protect, authorize, authorizeAdminOrWarehouse } = require('../middleware/auth');
+const {protect, authorize, authorizeAdminOrWarehouse, authorizeAdminLike, authorizeAdminWarehouseOrSupervisor} = require('../middleware/auth');
 const { createWarehouseDistributionStatusNotification, createAdminDistributionCompletedNotification } = require('./distributionNotifications');
-const { projectRef, storeRef } = require('../utils/embedRefs');
+const { projectRef, storeRef, userRef } = require('../utils/embedRefs');
 const { variantSegmentForStockDocId } = require('../utils/stockColors');
 const { buildStoreByProductKey, makeProductKey } = require('../utils/resolveProductStockStore');
+const { isAdminLike, isWarehouseLike, isSupervisor, userHasProjectAccess } = require('../utils/roles');
 
 function getStockId(productId, storeId, variantLabel) {
   const c = variantLabel && String(variantLabel).trim().toLowerCase();
@@ -42,6 +43,78 @@ function toIso(t) {
   return t?.toDate?.()?.toISOString?.() ?? (typeof t === 'string' ? t : null);
 }
 
+/** YYYY-MM-DD only (no time / Z). */
+function toDateOnly(t) {
+  const iso = toIso(t) ?? (typeof t === 'string' ? t : null);
+  if (!iso) return null;
+  const s = String(iso);
+  if (s.length >= 10 && /^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  try {
+    return new Date(s).toISOString().slice(0, 10);
+  } catch (_) {
+    return null;
+  }
+}
+
+function orderProductId(p) {
+  return String(p?.product?.id ?? p?.product?._id ?? p?.product ?? '');
+}
+
+/** Find matching replaced order line for a distribution product. */
+function findOrderReplacementLine(orderData, distProduct) {
+  const orig = String(distProduct.original_product_id || distProduct.originalProductId || '');
+  const ship = String(
+    distProduct.replacement_product_id
+      || distProduct.replacementProductId
+      || distProduct.product?.id
+      || distProduct.product
+      || ''
+  );
+  for (const op of orderData?.products || []) {
+    const oOrig = String(op.original_product_id ?? op.originalProductId ?? orderProductId(op));
+    const oShip = String(op.replacement_product_id ?? op.replacementProductId ?? orderProductId(op));
+    const oReplaced = !!(
+      op.is_replaced
+      ?? op.isReplaced
+      ?? (op.replacement_product_id && String(op.replacement_product_id) !== oOrig)
+    );
+    if (!oReplaced) continue;
+    if (oOrig === orig && oShip === ship) return op;
+  }
+  return null;
+}
+
+/** Manager (or admin) who approved the order — from audit history. */
+function orderApproverId(orderData) {
+  const history = Array.isArray(orderData?.history) ? orderData.history : [];
+  for (let i = history.length - 1; i >= 0; i -= 1) {
+    const h = history[i];
+    const to = h?.toStatus ?? h?.to_status ?? h?.to;
+    if ((h?.action === 'status_change' || h?.action === 'statusChange') && to === 'approved') {
+      return h.actorId || h.actor_id || h.by || null;
+    }
+  }
+  return null;
+}
+
+/**
+ * Copy Admin/Manager replacement audit from the order onto distribution lines
+ * (warehouse ships; they must not appear as the person who replaced).
+ */
+function enrichReplacementsFromOrder(firestoreProducts, orderData) {
+  if (!orderData) return firestoreProducts;
+  for (const p of firestoreProducts) {
+    if (!p.is_replaced) continue;
+    const op = findOrderReplacementLine(orderData, p);
+    if (!op) continue;
+    const by = op.replaced_by ?? op.replacedBy;
+    const at = op.replaced_at ?? op.replacedAt;
+    if (by) p.replaced_by = String(by);
+    if (at) p.replaced_at = toDateOnly(at) || at;
+  }
+  return firestoreProducts;
+}
+
 async function distributionToApi(doc, firestore) {
   if (!doc || !doc.exists) return null;
   const data = doc.data();
@@ -51,16 +124,71 @@ async function distributionToApi(doc, firestore) {
   const depotDoc = storeId && (!storeDoc || !storeDoc.exists) ? await firestore.collection('depots').doc(storeId).get() : null;
   const store = storeDoc?.exists ? storeDoc : depotDoc;
   const createdByDoc = await firestore.collection('users').doc(data.created_by).get();
-  const validatedByDoc = data.validated_by ? await firestore.collection('users').doc(data.validated_by).get() : null;
+
+  let orderData = null;
+  if (data.order_id) {
+    const orderDoc = await firestore.collection('orders').doc(String(data.order_id)).get();
+    if (orderDoc.exists) orderData = orderDoc.data();
+  }
+
+  // Prefer manager who approved the linked order as "Validated by".
+  let validatedById = data.validated_by || null;
+  if (orderData) {
+    const approverId = orderApproverId(orderData);
+    if (approverId) validatedById = String(approverId);
+  }
+  const validatedByDoc = validatedById ? await firestore.collection('users').doc(String(validatedById)).get() : null;
+
   const products = await Promise.all((data.products || []).map(async (p) => {
     const pid = p.product?.id ?? p.product;
     const color = p.color && String(p.color).trim() ? String(p.color).trim().toLowerCase() : null;
-    const productDoc = pid ? await firestore.collection('products').doc(pid).get() : null;
+    const productDoc = pid ? await firestore.collection('products').doc(String(pid)).get() : null;
     const productName = productDoc?.exists ? productDoc.data().name : null;
-    const out = { product: { id: pid, name: productName }, quantity: p.quantity };
+    const unit = productDoc?.exists ? (productDoc.data().unit || null) : null;
+    const originalId = p.original_product_id ?? p.originalProductId ?? null;
+    const replacementId = p.replacement_product_id ?? p.replacementProductId ?? null;
+    const isReplaced = !!(p.is_replaced ?? p.isReplaced ?? replacementId);
+    const orderLine = isReplaced && orderData ? findOrderReplacementLine(orderData, p) : null;
+    const replacedById = (orderLine?.replaced_by ?? orderLine?.replacedBy ?? p.replaced_by) || null;
+    const replacedAtRaw = orderLine?.replaced_at ?? orderLine?.replacedAt ?? p.replaced_at ?? null;
+    const out = {
+      product: { id: pid, name: productName, unit },
+      quantity: p.quantity,
+      isReplaced,
+      originalProductId: originalId ? String(originalId) : null,
+      replacementProductId: replacementId ? String(replacementId) : null,
+      replacedAt: toDateOnly(replacedAtRaw),
+    };
     if (color) out.color = color;
+    if (originalId) {
+      const od = await firestore.collection('products').doc(String(originalId)).get();
+      out.originalProduct = od.exists
+        ? { id: od.id, name: od.data().name, unit: od.data().unit || null }
+        : { id: String(originalId) };
+    }
+    if (replacementId) {
+      const rd = await firestore.collection('products').doc(String(replacementId)).get();
+      out.replacementProduct = rd.exists
+        ? { id: rd.id, name: rd.data().name, unit: rd.data().unit || null }
+        : { id: String(replacementId) };
+    }
+    if (replacedById) {
+      const ub = await firestore.collection('users').doc(String(replacedById)).get();
+      out.replacedBy = userRef(ub);
+    }
     return out;
   }));
+  const history = Array.isArray(data.history)
+    ? data.history.map((h) => ({
+        action: h?.action || null,
+        at: toDateOnly(h?.at) || toIso(h?.at) || null,
+        by: h?.by || null,
+        originalProductId: h?.original_product_id || h?.originalProductId || null,
+        replacementProductId: h?.replacement_product_id || h?.replacementProductId || null,
+        quantity: h?.quantity ?? null,
+        note: h?.note || null,
+      }))
+    : [];
   const distDate = data.distribution_date;
   const distDateStr = distDate && typeof distDate.toDate === 'function'
     ? distDate.toDate().toISOString().split('T')[0]
@@ -73,6 +201,7 @@ async function distributionToApi(doc, firestore) {
     project: projectRef(projectDoc),
     store: store?.exists ? storeRef(store) : null,
     products,
+    history,
     status: data.status,
     validatedBy: validatedByDoc?.exists ? (() => {
       const d = validatedByDoc.data();
@@ -88,12 +217,13 @@ async function distributionToApi(doc, firestore) {
       return { id: createdByDoc.id, name, nameAr: d.name_ar || null, email: d.email };
     })() : null,
     notes: data.notes,
+    orderId: data.order_id || null,
     createdAt: toIso(data.created_at) ?? data.created_at,
     updatedAt: toIso(data.updated_at) ?? data.updated_at,
   };
 }
 
-router.get('/', protect, authorizeAdminOrWarehouse, async (req, res) => {
+router.get('/', protect, authorizeAdminWarehouseOrSupervisor, async (req, res) => {
   try {
     const firestore = getFirestore();
     let q;
@@ -112,6 +242,9 @@ router.get('/', protect, authorizeAdminOrWarehouse, async (req, res) => {
     if (req.query.status && req.query.project) {
       docs = docs.filter(d => d.data().project_id === req.query.project);
     }
+    if (isSupervisor(req.user?.role)) {
+      docs = docs.filter((d) => userHasProjectAccess(req.user, d.data().project_id));
+    }
     // Sort in memory when we used project filter (no orderBy)
     if (req.query.project || req.query.status) {
       docs = docs.sort((a, b) => {
@@ -127,11 +260,39 @@ router.get('/', protect, authorizeAdminOrWarehouse, async (req, res) => {
   }
 });
 
-router.get('/:id', protect, authorizeAdminOrWarehouse, async (req, res) => {
+router.get('/count', protect, authorizeAdminWarehouseOrSupervisor, async (req, res) => {
+  try {
+    const firestore = getFirestore();
+    let q;
+    if (req.query.status) {
+      q = firestore.collection('distributions').where('status', '==', req.query.status);
+    } else if (req.query.project) {
+      q = firestore.collection('distributions').where('project_id', '==', req.query.project);
+    } else {
+      q = firestore.collection('distributions');
+    }
+    const snapshot = await q.get();
+    let docs = snapshot.docs;
+    if (req.query.status && req.query.project) {
+      docs = docs.filter((d) => d.data().project_id === req.query.project);
+    }
+    if (isSupervisor(req.user?.role)) {
+      docs = docs.filter((d) => userHasProjectAccess(req.user, d.data().project_id));
+    }
+    res.json({ success: true, count: docs.length });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+router.get('/:id', protect, authorizeAdminWarehouseOrSupervisor, async (req, res) => {
   try {
     const firestore = getFirestore();
     const doc = await firestore.collection('distributions').doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ success: false, message: 'Distribution not found' });
+    if (isSupervisor(req.user?.role) && !userHasProjectAccess(req.user, doc.data().project_id)) {
+      return res.status(403).json({ success: false, message: 'You do not have access to this distribution' });
+    }
     const data = await distributionToApi(doc, firestore);
     res.json({ success: true, data });
   } catch (error) {
@@ -172,12 +333,12 @@ function msgInsufficientStockValidate(displayName, available, quantity, req) {
 function msgNoApprovedOrder(req) {
   const lang = apiLang(req);
   if (lang === 'en') {
-    return 'No approved order found for this project and store. Admin must approve an order first.';
+    return 'No approved order found for this project and store. Manager must approve an order first.';
   }
   if (lang === 'ar') {
-    return 'لا يوجد طلب مُعتمد لهذا المشروع وهذا المخزن. يجب أن يعتمد المسؤول الطلب أولاً.';
+    return 'لا يوجد طلب مُعتمد لهذا المشروع وهذا المخزن. يجب أن يعتمد المدير الطلب أولاً.';
   }
-  return "Aucune commande approuvee n'a ete trouvee pour ce projet et ce depot. L'admin doit d'abord approuver une commande.";
+  return "Aucune commande approuvee n'a ete trouvee pour ce projet et ce depot. Le manager doit d'abord approuver une commande.";
 }
 
 function generateSerialNumber() {
@@ -191,24 +352,98 @@ function generateSerialNumber() {
 
 const colorFromItem = (c) => (c && String(c).trim() ? String(c).trim().toLowerCase() : null);
 
-/** Merge duplicate distribution lines (same product + color) */
-function mergeDistributionProducts(items = []) {
+/** Normalize one distribution line; `product` is always the SKU that is shipped / deducted. */
+function normalizeDistributionLine(raw, actorId) {
+  const incomingProduct = raw?.product?.id ?? raw?.product?._id ?? raw?.product;
+  const originalId = raw?.original_product_id ?? raw?.originalProductId ?? incomingProduct;
+  const replacementId = raw?.replacement_product_id ?? raw?.replacementProductId ?? null;
+  const isReplaced = !!(raw?.is_replaced ?? raw?.isReplaced ?? (replacementId && String(replacementId) !== String(originalId)));
+  if (isReplaced && (!replacementId || String(replacementId) === String(originalId))) {
+    return { error: 'Replacement product must be different from the original product' };
+  }
+  const shipId = isReplaced ? String(replacementId) : String(originalId || incomingProduct || '');
+  const quantity = Number(raw?.quantity || 0);
+  if (!shipId || !Number.isFinite(quantity) || quantity <= 0) return null;
+  const color = colorFromItem(raw?.color);
+  const originalColor = colorFromItem(raw?.original_color ?? raw?.originalColor) || (isReplaced ? null : color);
+  const out = {
+    product: shipId,
+    quantity,
+    original_product_id: String(originalId || shipId),
+    replacement_product_id: isReplaced ? String(replacementId) : null,
+    is_replaced: isReplaced,
+  };
+  if (color) out.color = color;
+  if (originalColor) out.original_color = originalColor;
+  if (isReplaced) {
+    out.replaced_at = raw?.replaced_at ?? raw?.replacedAt ?? new Date().toISOString();
+    out.replaced_by = raw?.replaced_by ?? raw?.replacedBy ?? actorId ?? null;
+  }
+  return out;
+}
+
+/** Merge duplicate distribution lines (same shipped product + color + original). */
+function mergeDistributionProducts(items = [], actorId) {
   const merged = new Map();
   for (const raw of items) {
-    const productId = raw?.product?.id ?? raw?.product?._id ?? raw?.product;
-    const quantity = Number(raw?.quantity || 0);
-    if (!productId || !Number.isFinite(quantity) || quantity <= 0) continue;
-    const color = colorFromItem(raw?.color);
-    const key = `${productId}__${color || ''}`;
+    const normalized = normalizeDistributionLine(raw, actorId);
+    if (!normalized) continue;
+    if (normalized.error) return { error: normalized.error };
+    const color = normalized.color || '';
+    const key = `${normalized.product}__${color}__${normalized.original_product_id || ''}`;
     if (!merged.has(key)) {
-      const out = { product: productId, quantity };
-      if (color) out.color = color;
-      merged.set(key, out);
+      merged.set(key, { ...normalized });
     } else {
-      merged.get(key).quantity += quantity;
+      merged.get(key).quantity += normalized.quantity;
     }
   }
-  return Array.from(merged.values());
+  return { products: Array.from(merged.values()) };
+}
+
+function buildReplacementHistory(products, actorId) {
+  const now = new Date().toISOString();
+  return (products || [])
+    .filter((p) => p.is_replaced && p.replacement_product_id)
+    .map((p) => ({
+      action: 'product_replaced',
+      at: p.replaced_at || now,
+      by: p.replaced_by || actorId || null,
+      original_product_id: p.original_product_id || null,
+      replacement_product_id: p.replacement_product_id || null,
+      quantity: p.quantity ?? null,
+      note: 'Product replaced due to insufficient stock',
+    }));
+}
+
+/**
+ * Warehouse may ship replacements only if they were already approved on the linked order
+ * (Admin/Manager did the replacement earlier). They cannot invent new replacements here.
+ */
+function warehouseReplacementsMatchOrder(firestoreProducts, orderData) {
+  const orderLines = orderData?.products || [];
+  for (const p of firestoreProducts) {
+    if (!p.is_replaced) continue;
+    const orig = String(p.original_product_id || '');
+    const ship = String(p.replacement_product_id || p.product || '');
+    const match = orderLines.some((op) => {
+      const oOrig = String(op.original_product_id ?? op.originalProductId ?? op.product?.id ?? op.product ?? '');
+      const oShip = String(
+        op.replacement_product_id
+          ?? op.replacementProductId
+          ?? (op.is_replaced || op.isReplaced ? (op.product?.id ?? op.product) : '')
+          ?? ''
+      );
+      const oReplaced = !!(
+        op.is_replaced
+        ?? op.isReplaced
+        ?? (op.replacement_product_id && String(op.replacement_product_id) !== oOrig)
+      );
+      if (!oReplaced) return false;
+      return oOrig === orig && oShip === ship;
+    });
+    if (!match) return false;
+  }
+  return true;
 }
 
 /**
@@ -216,28 +451,53 @@ function mergeDistributionProducts(items = []) {
  * @param {'create'|'validate'} messageKind
  */
 async function assertStockAvailableForDistribution(firestore, products, storeId, req, messageKind, storeByKey) {
-  for (const item of products) {
+  const insufficient = [];
+  for (let i = 0; i < products.length; i++) {
+    const item = products[i];
     const productId = item.product?.id ?? item.product?._id ?? item.product;
     const itemColor = colorFromItem(item.color);
     const quantity = item.quantity || 0;
-    const lineStoreId = storeByKey?.get(makeProductKey(productId, itemColor)) ?? storeId;
+    const mapKeyProduct = item.original_product_id || productId;
+    const lineStoreId = storeByKey?.get(makeProductKey(mapKeyProduct, itemColor))
+      ?? storeByKey?.get(makeProductKey(productId, itemColor))
+      ?? storeId;
     const available = await getAvailableStock(firestore, productId, lineStoreId, itemColor);
     if (available < quantity) {
-      const productDoc = await firestore.collection('products').doc(productId).get();
+      const productDoc = await firestore.collection('products').doc(String(productId)).get();
       const productName = productDoc?.exists ? productDoc.data().name : productId;
       const displayName = itemColor ? `${productName} (${itemColor})` : productName;
-      const msg =
-        messageKind === 'create'
-          ? msgInsufficientStockCreate(displayName, available, quantity, req)
-          : msgInsufficientStockValidate(displayName, available, quantity, req);
-      return { status: 400, body: { success: false, message: msg } };
+      insufficient.push({
+        index: i,
+        productId: String(productId),
+        originalProductId: item.original_product_id ? String(item.original_product_id) : String(productId),
+        productName: displayName,
+        available,
+        required: quantity,
+        color: itemColor,
+        storeId: lineStoreId,
+      });
     }
   }
-  return null;
+  if (insufficient.length === 0) return null;
+  const first = insufficient[0];
+  const msg =
+    messageKind === 'create'
+      ? msgInsufficientStockCreate(first.productName, first.available, first.required, req)
+      : msgInsufficientStockValidate(first.productName, first.available, first.required, req);
+  return {
+    status: 400,
+    body: {
+      success: false,
+      code: 'INSUFFICIENT_STOCK',
+      message: msg,
+      canReplace: isAdminLike(req.user?.role),
+      insufficient,
+    },
+  };
 }
 
 /**
- * Deduct warehouse stock only.
+ * Deduct warehouse stock only (shipped product id).
  * Project BOQ remaining (`projects.products`) is already decremented when the user places an order
  * (`POST /orders`). Applying the same decrement here caused quantities to "double" (rest / distributed wrong).
  */
@@ -245,12 +505,18 @@ async function applyDistributionDeductions(firestore, products, projectId, store
   for (const item of products) {
     const productId = item.product?.id ?? item.product?._id ?? item.product;
     const itemColor = colorFromItem(item.color);
-    const lineStoreId = storeByKey?.get(makeProductKey(productId, itemColor)) ?? storeId;
+    const mapKeyProduct = item.original_product_id || productId;
+    const lineStoreId = storeByKey?.get(makeProductKey(mapKeyProduct, itemColor))
+      ?? storeByKey?.get(makeProductKey(productId, itemColor))
+      ?? storeId;
+    const notes = item.is_replaced
+      ? `Distribution (replaced ${item.original_product_id} → ${productId})`
+      : 'Distribution';
     await updateStock(productId, lineStoreId, -item.quantity, 'distribution', {
       project: projectId,
       user: userId,
       reference: bonAlimentation,
-      notes: 'Distribution',
+      notes,
       variant: itemColor,
     });
   }
@@ -331,12 +597,32 @@ router.post('/', protect, authorizeAdminOrWarehouse, async (req, res) => {
       }
     }
 
-    const firestoreProducts = mergeDistributionProducts(products.map((p) => {
-      const pid = p.product?.id ?? p.product?._id ?? p.product;
-      const out = { product: pid, quantity: p.quantity };
-      if (p.color && String(p.color).trim()) out.color = String(p.color).trim().toLowerCase();
-      return out;
-    }));
+    const merged = mergeDistributionProducts(products, req.user.id);
+    if (merged.error) {
+      return res.status(400).json({ success: false, message: merged.error });
+    }
+    const firestoreProducts = merged.products;
+    if (!firestoreProducts.length) {
+      return res.status(400).json({ success: false, message: 'Please provide project, store, and products' });
+    }
+    // Admin/Manager may invent replacements. Warehouse may only ship ones already on the order.
+    const hasReplacement = firestoreProducts.some((p) => p.is_replaced);
+    if (hasReplacement && !isAdminLike(req.user?.role)) {
+      const oid = orderId && String(orderId).trim();
+      const orderOk = oid
+        && orderDocForStores?.exists
+        && isWarehouseLike(req.user?.role)
+        && warehouseReplacementsMatchOrder(firestoreProducts, orderDocForStores.data());
+      if (!orderOk) {
+        return res.status(403).json({
+          success: false,
+          message: 'Only Admin or Manager can replace products',
+        });
+      }
+    }
+    if (orderDocForStores?.exists) {
+      enrichReplacementsFromOrder(firestoreProducts, orderDocForStores.data());
+    }
     const storeByKey = orderDocForStores?.exists
       ? buildStoreByProductKey(orderDocForStores.data(), storeId)
       : null;
@@ -347,6 +633,13 @@ router.post('/', protect, authorizeAdminOrWarehouse, async (req, res) => {
     const existing = await firestore.collection('distributions').where('bon_alimentation', '==', bonValue).limit(1).get();
     if (!existing.empty) return res.status(400).json({ success: false, message: 'Bon Alimentation/Serial number already exists' });
     const distDate = distributionDate ? new Date(distributionDate) : admin.firestore.FieldValue.serverTimestamp();
+    const history = buildReplacementHistory(firestoreProducts, req.user.id);
+    // Warehouse creates the distribution; Manager who approved the order is "Validated by".
+    let validatedById = req.user.id;
+    if (isWarehouseLike(req.user?.role) && orderDocForStores?.exists) {
+      const approverId = orderApproverId(orderDocForStores.data());
+      if (approverId) validatedById = String(approverId);
+    }
     const ref = await firestore.collection('distributions').add({
       serial_number: serialNumber,
       bon_alimentation: bonValue,
@@ -358,6 +651,7 @@ router.post('/', protect, authorizeAdminOrWarehouse, async (req, res) => {
       distribution_date: distDate,
       notes: notes || null,
       products: firestoreProducts,
+      history,
       created_at: admin.firestore.FieldValue.serverTimestamp(),
       updated_at: admin.firestore.FieldValue.serverTimestamp(),
     });
@@ -373,7 +667,7 @@ router.post('/', protect, authorizeAdminOrWarehouse, async (req, res) => {
     }
     await ref.update({
       status: 'validated',
-      validated_by: req.user.id,
+      validated_by: validatedById,
       validated_at: admin.firestore.FieldValue.serverTimestamp(),
       updated_at: admin.firestore.FieldValue.serverTimestamp(),
     });
@@ -383,8 +677,23 @@ router.post('/', protect, authorizeAdminOrWarehouse, async (req, res) => {
       if (orderDoc.exists) {
         const st = orderDoc.data().status;
         if (st === 'approved' || st === 'completed') {
+          // Distribution day + arrival day (same calendar day when delivered with the distribution).
+          // UI "Arrive in" = inclusive days between those two dates (min 1).
+          let distYmd = null;
+          if (distributionDate) {
+            distYmd = String(distributionDate).slice(0, 10);
+          } else if (distDate && typeof distDate.toDate === 'function') {
+            distYmd = distDate.toDate().toISOString().split('T')[0];
+          } else if (distDate instanceof Date && !Number.isNaN(distDate.getTime())) {
+            distYmd = distDate.toISOString().split('T')[0];
+          }
+          if (!distYmd || !/^\d{4}-\d{2}-\d{2}/.test(distYmd)) {
+            distYmd = new Date().toISOString().split('T')[0];
+          }
           await orderRef.update({
             status: 'completed',
+            distribution_date: distYmd,
+            arrival_date: distYmd,
             delivery_date: admin.firestore.FieldValue.serverTimestamp(),
             updated_at: admin.firestore.FieldValue.serverTimestamp(),
           });
@@ -408,7 +717,11 @@ router.put('/:id/validate', protect, authorizeAdminOrWarehouse, async (req, res)
     if (!doc.exists) return res.status(404).json({ success: false, message: 'Distribution not found' });
     const data = doc.data();
     if (data.status === 'validated') return res.status(400).json({ success: false, message: 'Distribution already validated' });
-    const products = mergeDistributionProducts(data.products || []);
+    const merged = mergeDistributionProducts(data.products || [], req.user.id);
+    if (merged.error) {
+      return res.status(400).json({ success: false, message: merged.error });
+    }
+    const products = merged.products;
     const projectId = data.project_id;
     const sid = data.store_id || data.depot_id;
 
@@ -437,7 +750,7 @@ router.put('/:id/validate', protect, authorizeAdminOrWarehouse, async (req, res)
   }
 });
 
-router.put('/:id/refuse', protect, authorize('admin'), async (req, res) => {
+router.put('/:id/refuse', protect, authorizeAdminLike, async (req, res) => {
   try {
     const firestore = getFirestore();
     const ref = firestore.collection('distributions').doc(req.params.id);

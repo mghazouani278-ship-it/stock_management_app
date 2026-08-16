@@ -11,9 +11,7 @@ import 'providers/locale_provider.dart';
 import 'services/token_storage.dart';
 import 'screens/splash/splash_screen.dart';
 import 'screens/auth/login_screen.dart';
-import 'screens/admin/admin_home_screen.dart';
-import 'screens/user/user_home_screen.dart';
-import 'screens/warehouse/warehouse_home_screen.dart';
+import 'screens/home_router.dart';
 import 'navigation/app_route_observer.dart';
 
 void main() {
@@ -123,7 +121,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
   }
 
   Future<void> _checkAuth() async {
-    const minSplashDuration = Duration(seconds: 2);
+    const minSplashDuration = Duration(milliseconds: 300);
     const authTimeout = Duration(seconds: 2);
 
     try {
@@ -143,30 +141,27 @@ class _AuthWrapperState extends State<AuthWrapper> {
         }
       });
 
-      final results = await Future.wait([
-        Future.delayed(minSplashDuration),
-        authFuture.timeout(authTimeout, onTimeout: () => (false, null)),
-      ]);
-
-      var (isAuthenticated, userRole) = results[1] as (bool, String?);
-
-      if (mounted && isAuthenticated) {
-        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      // Start /auth/me as soon as we know there is a token — don't wait for splash.
+      final AuthProvider authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final earlyAuth = authFuture.then((result) async {
+        final (ok, role) = result;
+        if (!ok) return (false, role, false);
         try {
           final loaded = await authProvider
               .loadUser()
-              .timeout(const Duration(seconds: 15), onTimeout: () => false);
-          if (!loaded) {
-            isAuthenticated = false;
-            userRole = null;
-          } else {
-            userRole = authProvider.user?.role ?? userRole;
-          }
+              .timeout(const Duration(seconds: 10), onTimeout: () => false);
+          return (loaded, authProvider.user?.role ?? role, loaded);
         } catch (_) {
-          isAuthenticated = false;
-          userRole = null;
+          return (false, null, false);
         }
-      }
+      });
+
+      final results = await Future.wait([
+        Future.delayed(minSplashDuration),
+        earlyAuth.timeout(const Duration(seconds: 12), onTimeout: () => (false, null, false)),
+      ]);
+
+      final (isAuthenticated, userRole, _) = results[1] as (bool, String?, bool);
 
       if (mounted) {
         setState(() {
@@ -193,14 +188,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
     }
 
     if (_isAuthenticated) {
-      final role = (_userRole ?? '').toLowerCase().replaceAll(' ', '_');
-      if (role == 'admin') {
-        return const AdminHomeScreen();
-      } else if (role == 'warehouse_user' || role == 'warehouse' || role == 'warehouseuser') {
-        return const WarehouseHomeScreen();
-      } else {
-        return const UserHomeScreen();
-      }
+      return homeScreenForRole(_userRole);
     }
 
     return const LoginScreen();

@@ -3,8 +3,16 @@ const router = express.Router();
 const { getFirestore } = require('../firebase');
 const { admin } = require('../firebase');
 const updateStock = require('../utils/updateStock');
-const { protect, authorize } = require('../middleware/auth');
+const {protect, authorize, authorizeAdminLike} = require('../middleware/auth');
 const { projectRef, storeRef, userRef } = require('../utils/embedRefs');
+const {
+  normalizeRole,
+  isUser,
+  isSupervisor,
+  isAdminLike,
+  isWarehouseLike,
+  userHasProjectAccess,
+} = require('../utils/roles');
 
 function toIso(t) {
   return t?.toDate?.()?.toISOString?.() ?? (typeof t === 'string' ? t : null);
@@ -54,12 +62,16 @@ router.get('/', protect, async (req, res) => {
   try {
     const firestore = getFirestore();
     let docs;
-    if (req.user.role === 'user') {
+    if (isUser(req.user.role)) {
       const snapshot = await firestore.collection('damaged_products').where('reported_by', '==', req.user.id).get();
       docs = snapshot.docs;
     } else {
       const snapshot = await firestore.collection('damaged_products').get();
       docs = snapshot.docs;
+      if (isSupervisor(req.user.role)) {
+        const allowed = (req.user.project_ids || []).map(String);
+        docs = docs.filter((d) => allowed.includes(String(d.data().project_id)));
+      }
       if (req.query.project) docs = docs.filter(d => d.data().project_id === req.query.project);
       if (req.query.store) docs = docs.filter(d => d.data().store_id === req.query.store);
       if (req.query.depot) docs = docs.filter(d => d.data().depot_id === req.query.depot);
@@ -83,7 +95,12 @@ router.get('/:id', protect, async (req, res) => {
     const firestore = getFirestore();
     const doc = await firestore.collection('damaged_products').doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ success: false, message: 'Damaged product not found' });
-    if (req.user.role === 'user' && doc.data().reported_by !== req.user.id) return res.status(403).json({ success: false, message: 'You do not have access to this record' });
+    if (isUser(req.user.role) && doc.data().reported_by !== req.user.id) {
+      return res.status(403).json({ success: false, message: 'You do not have access to this record' });
+    }
+    if (isSupervisor(req.user.role) && !userHasProjectAccess(req.user, doc.data().project_id)) {
+      return res.status(403).json({ success: false, message: 'You do not have access to this record' });
+    }
     const data = await damagedToApi(doc, firestore);
     res.json({ success: true, data });
   } catch (error) {
@@ -94,13 +111,53 @@ router.get('/:id', protect, async (req, res) => {
 router.post('/', protect, async (req, res) => {
   try {
     const { product, store, depot, quantity, reason, notes } = req.body;
-    const storeId = store || depot;
-    if (!product || !storeId || !quantity || !reason) return res.status(400).json({ success: false, message: 'Please provide product, store, quantity, and reason' });
+    let storeId = store || depot || null;
+    if (!product || !quantity || !reason) {
+      return res.status(400).json({ success: false, message: 'Please provide product, quantity, and reason' });
+    }
     if (quantity <= 0) return res.status(400).json({ success: false, message: 'Quantity must be greater than 0' });
-    if (req.user.role === 'user' && !req.user.project_id) return res.status(400).json({ success: false, message: 'You are not assigned to any project' });
-    const projectId = (req.user.role === 'admin' || req.user.role === 'warehouse_user') ? req.body.projectId : req.user.project_id;
+
+    const role = normalizeRole(req.user.role);
+    let projectId;
+    if (isAdminLike(role) || isWarehouseLike(role) || isSupervisor(role)) {
+      projectId = req.body.projectId || req.body.project_id || null;
+      if (isSupervisor(role)) {
+        if (!projectId) return res.status(400).json({ success: false, message: 'Please provide project ID' });
+        if (!userHasProjectAccess(req.user, projectId)) {
+          return res.status(403).json({ success: false, message: 'You do not have access to this project' });
+        }
+      }
+    } else {
+      if (!req.user.project_id) return res.status(400).json({ success: false, message: 'You are not assigned to any project' });
+      projectId = req.user.project_id;
+    }
     if (!projectId) return res.status(400).json({ success: false, message: 'Please provide project ID' });
+
     const firestore = getFirestore();
+
+    // Resolve store automatically from product config / stock when not provided.
+    if (!storeId) {
+      const productDoc = await firestore.collection('products').doc(String(product)).get();
+      if (productDoc.exists) {
+        const storesMap = productDoc.data().stores || productDoc.data().depots || {};
+        const firstStoreId = Object.keys(storesMap)[0];
+        if (firstStoreId) storeId = firstStoreId;
+      }
+      if (!storeId) {
+        const stockSnap = await firestore.collection('stock').where('product_id', '==', String(product)).limit(1).get();
+        if (!stockSnap.empty) {
+          const sd = stockSnap.docs[0].data();
+          storeId = sd.store_id || sd.depot_id || null;
+        }
+      }
+    }
+    if (!storeId) {
+      return res.status(400).json({
+        success: false,
+        message: 'No store found for this product. Add stock or assign a store to the product first.',
+      });
+    }
+
     const ref = await firestore.collection('damaged_products').add({
       product_id: product,
       project_id: projectId,
@@ -152,7 +209,7 @@ router.put('/:id/approve', protect, async (req, res) => {
   }
 });
 
-router.delete('/:id', protect, authorize('admin'), async (req, res) => {
+router.delete('/:id', protect, authorizeAdminLike, async (req, res) => {
   try {
     const firestore = getFirestore();
     const ref = firestore.collection('damaged_products').doc(req.params.id);

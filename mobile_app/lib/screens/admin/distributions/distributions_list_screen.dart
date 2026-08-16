@@ -8,6 +8,7 @@ import '../../../widgets/connection_error_widget.dart';
 import '../../../utils/embedded_ref_localized.dart';
 import '../../../utils/l10n_ui_helpers.dart';
 import '../../../utils/product_localized.dart';
+import '../../../utils/project_localized.dart';
 import '../../warehouse/warehouse_distribution_form_screen.dart';
 
 class DistributionsListScreen extends StatefulWidget {
@@ -301,12 +302,41 @@ class _DistributionsListScreenState extends State<DistributionsListScreen> {
               ),
               const SizedBox(height: 16),
               Text(l10n.productsLabel, style: const TextStyle(fontWeight: FontWeight.bold)),
-              ...dist.products.map((p) => Padding(
+              ...dist.products.map((p) {
+                final name = p.productName != null && p.productName!.trim().isNotEmpty
+                    ? localizedApiProductName(ctx, p.productName!)
+                    : l10n.product;
+                if (!p.isReplaced) {
+                  return Padding(
                     padding: const EdgeInsets.only(top: 4),
-                    child: Text(
-                      '  • ${p.productName != null && p.productName!.trim().isNotEmpty ? localizedApiProductName(ctx, p.productName!) : l10n.product}: ${p.quantity}',
-                    ),
-                  )),
+                    child: Text('  • $name: ${p.quantity}'),
+                  );
+                }
+                final original = p.originalProductName != null && p.originalProductName!.trim().isNotEmpty
+                    ? localizedApiProductName(ctx, p.originalProductName!)
+                    : (p.originalProductId ?? l10n.product);
+                final replaced = p.replacementProductName != null && p.replacementProductName!.trim().isNotEmpty
+                    ? localizedApiProductName(ctx, p.replacementProductName!)
+                    : name;
+                final by = p.replacedBy != null
+                    ? localizedDisplayUserName(ctx, p.replacedBy!.name, nameAr: p.replacedBy!.nameAr)
+                    : null;
+                return Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('  • ${l10n.originalProduct}: $original'),
+                      Text('    ${l10n.replacedByProduct}: $replaced'),
+                      Text('    ${l10n.quantity}: ${p.quantity}'),
+                      if (p.replacedAt != null && p.replacedAt!.isNotEmpty)
+                        Text('    ${l10n.replacementDate}: ${p.replacedAt!.split('T').first}'),
+                      if (by != null && by.isNotEmpty)
+                        Text('    ${l10n.replacedByAdmin}: $by'),
+                    ],
+                  ),
+                );
+              }),
               if (dist.notes != null && dist.notes!.isNotEmpty) ...[
                 const SizedBox(height: 16),
                 Text(l10n.notesLabel(dist.notes!)),
@@ -428,8 +458,14 @@ class _DistributionsListScreenState extends State<DistributionsListScreen> {
                     final status = n['status'] as String? ?? '';
                     final isAccepted = status == 'accepted';
                     final bon = n['bonAlimentation'] ?? n['distributionId'] ?? '—';
-                    final projectName = n['projectName'] ?? '';
-                    final storeName = n['storeName'] ?? '';
+                    final projectName = localizedProjectName(
+                      context,
+                      (n['projectName'] ?? '').toString(),
+                    );
+                    final storeName = localizedDamagedStoreName(
+                      context,
+                      (n['storeName'] ?? '').toString(),
+                    );
                     final subtitle = [projectName, storeName].where((s) => s.isNotEmpty).join(' • ');
                     return Card(
                       margin: const EdgeInsets.only(bottom: 8),

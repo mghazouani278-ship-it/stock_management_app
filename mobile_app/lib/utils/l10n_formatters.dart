@@ -38,6 +38,33 @@ class L10nFormatters {
     return null;
   }
 
+  /// Format API date as date only (no time / Z suffix).
+  static String? formatDateOnlyFromApi(BuildContext context, dynamic val) {
+    if (val == null) return null;
+    if (val is String) {
+      final s = val.trim();
+      if (s.length >= 10 && RegExp(r'^\d{4}-\d{2}-\d{2}').hasMatch(s)) {
+        final parsed = DateTime.tryParse(s.length > 10 ? s : '${s}T00:00:00');
+        if (parsed != null) return formatDateShort(context, parsed);
+        return s.substring(0, 10);
+      }
+    }
+    DateTime? dt;
+    if (val is String) {
+      dt = DateTime.tryParse(val);
+    } else if (val is int) {
+      dt = DateTime.fromMillisecondsSinceEpoch(val * 1000);
+    } else if (val is num) {
+      dt = DateTime.fromMillisecondsSinceEpoch(val.toInt() * 1000);
+    } else if (val is Map && (val['_seconds'] != null || val['seconds'] != null)) {
+      final secVal = val['_seconds'] ?? val['seconds'] ?? 0;
+      final sec = (secVal is num) ? secVal.toInt() : int.tryParse(secVal.toString()) ?? 0;
+      dt = DateTime.fromMillisecondsSinceEpoch(sec * 1000);
+    }
+    if (dt != null) return formatDateShort(context, dt);
+    return null;
+  }
+
   /// Format a number according to the current locale (Arabic numerals for ar).
   static String formatNumber(BuildContext context, num value) {
     final locale = context.l10n.localeName;

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../models/user.dart';
+import '../../../providers/auth_provider.dart';
 import '../../../providers/locale_provider.dart';
 import '../../../services/api_service.dart';
 import '../../../widgets/app_search_bar.dart';
@@ -11,6 +12,7 @@ import '../../../utils/l10n_formatters.dart';
 import '../../../utils/product_localized.dart';
 import '../../../utils/project_localized.dart';
 import '../../../utils/project_report_pdf.dart';
+import '../../../utils/roles.dart';
 import 'project_form_screen.dart';
 
 class ProjectsListScreen extends StatefulWidget {
@@ -65,12 +67,13 @@ class _ProjectsListScreenState extends State<ProjectsListScreen> {
   }
 
   Future<void> _loadProjects() async {
+    final hadData = _projects.isNotEmpty;
     setState(() {
-      _loading = true;
+      if (!hadData) _loading = true;
       _error = null;
     });
     try {
-      final res = await _apiService.get('/projects');
+      final res = await _apiService.get('/projects', queryParams: {'light': 'true'});
       if (res['success'] == true && res['data'] != null) {
         setState(() {
           _projects = (res['data'] as List)
@@ -89,11 +92,19 @@ class _ProjectsListScreenState extends State<ProjectsListScreen> {
     }
   }
 
-  void _showProjectDetails(Project project) {
+  Future<void> _showProjectDetails(Project project) async {
+    Project full = project;
+    try {
+      final res = await _apiService.get('/projects/${project.id}');
+      if (res['success'] == true && res['data'] is Map) {
+        full = Project.fromJson(Map<String, dynamic>.from(res['data'] as Map));
+      }
+    } catch (_) {}
+    if (!mounted) return;
     final l10n = AppLocalizations.of(context)!;
-    final name = project.displayName(context);
-    final desc = project.displayDescription(context);
-    final owner = project.displayOwner(context);
+    final name = full.displayName(context);
+    final desc = full.displayDescription(context);
+    final owner = full.displayOwner(context);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -124,8 +135,8 @@ class _ProjectsListScreenState extends State<ProjectsListScreen> {
               ),
               const SizedBox(height: 8),
               Chip(
-                label: Text(_statusLabel(context, project.status), style: const TextStyle(fontSize: 12)),
-                backgroundColor: project.status == 'active' ? Colors.green.withOpacity(0.2) : Colors.grey.withOpacity(0.2),
+                label: Text(_statusLabel(context, full.status), style: const TextStyle(fontSize: 12)),
+                backgroundColor: full.status == 'active' ? Colors.green.withOpacity(0.2) : Colors.grey.withOpacity(0.2),
               ),
               if (desc != null && desc.isNotEmpty) ...[
                 const SizedBox(height: 16),
@@ -139,11 +150,11 @@ class _ProjectsListScreenState extends State<ProjectsListScreen> {
                 const SizedBox(height: 4),
                 Text(owner, style: TextStyle(fontSize: 14, color: Colors.grey[700])),
               ],
-              if (project.users != null && project.users!.isNotEmpty) ...[
+              if (full.users != null && full.users!.isNotEmpty) ...[
                 const SizedBox(height: 16),
                 Text(l10n.usersAssigned, style: TextStyle(fontSize: 14, color: Colors.grey[700])),
               ],
-              if (project.products != null && project.products!.isNotEmpty) ...[
+              if (full.products != null && full.products!.isNotEmpty) ...[
                 const SizedBox(height: 16),
                 Text(l10n.products, style: const TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
@@ -154,15 +165,12 @@ class _ProjectsListScreenState extends State<ProjectsListScreen> {
                 const SizedBox(height: 8),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: project.products!.map((p) {
-                    final requested = p.requestedQuantity; // Quantité initiale demandée
+                  children: full.products!.map((p) {
+                    final requested = p.requestedQuantity;
                     final supplementary = p.supplementaryQuantity;
-                    // Use raw distributed for supplementary overflow, but keep displayed distributed capped at requested.
                     final distRaw = p.distributedQuantity;
                     final distQty = distRaw >= requested ? requested : distRaw;
                     final supplementaryFromDistribution = distRaw > requested ? (distRaw - requested) : 0;
-                    // If extra has already been physically distributed, show that real extra amount.
-                    // Otherwise fallback to supplementary counter once BOQ requested is fully distributed.
                     final supplementaryDisplay = supplementaryFromDistribution > 0
                         ? supplementaryFromDistribution
                         : (distQty >= requested ? supplementary : 0);
@@ -188,7 +196,8 @@ class _ProjectsListScreenState extends State<ProjectsListScreen> {
                                     runSpacing: 6,
                                     crossAxisAlignment: WrapCrossAlignment.center,
                                     children: [
-                                      _buildQuantityChip(context, l10n.requestedBoq, requested, Colors.blue),
+                                      _buildQuantityChip(context, l10n.requestedQuantityLabel, requested, Colors.blue),
+                                      _buildQuantityChip(context, l10n.remainingRequestedLabel, p.allowedQuantity, Colors.blueGrey),
                                       _buildQuantityChip(context, l10n.distributed, distQty, Colors.green),
                                     ],
                                   ),
@@ -199,7 +208,7 @@ class _ProjectsListScreenState extends State<ProjectsListScreen> {
                             ),
                           ),
                         );
-                      }).toList(),
+                  }).toList(),
                 ),
               ],
             ],
@@ -267,6 +276,7 @@ class _ProjectsListScreenState extends State<ProjectsListScreen> {
   }
 
   Future<void> _showProjectPdfExportOptions(Map<String, dynamic> projectData) async {
+    final l10n = AppLocalizations.of(context)!;
     final project = Project.fromJson(Map<String, dynamic>.from(projectData));
     final createdStr = project.createdAt == null
         ? '—'
@@ -308,7 +318,7 @@ class _ProjectsListScreenState extends State<ProjectsListScreen> {
                   ),
                   ListTile(
                     leading: const Icon(Icons.picture_as_pdf_outlined),
-                    title: const Text('Print full project PDF'),
+                    title: Text(l10n.printFullProjectPdf),
                     onTap: () {
                       Navigator.pop(ctx);
                       ProjectReportPdf.export(context, projectData, mode: ProjectReportPdf.modeFull);
@@ -316,7 +326,7 @@ class _ProjectsListScreenState extends State<ProjectsListScreen> {
                   ),
                   ListTile(
                     leading: const Icon(Icons.date_range_outlined),
-                    title: const Text('Print creation date'),
+                    title: Text(l10n.printCreationDate),
                     subtitle: Text(createdStr),
                     onTap: () {
                       Navigator.pop(ctx);
@@ -330,7 +340,7 @@ class _ProjectsListScreenState extends State<ProjectsListScreen> {
                   for (int i = 0; i < updates.length; i++)
                     ListTile(
                       leading: const Icon(Icons.update_outlined),
-                      title: Text('Print project update #${i + 1}'),
+                      title: Text(l10n.printProjectUpdateNumber(i + 1)),
                       subtitle: Text(
                         L10nFormatters.formatDateTime(
                           context,
@@ -349,8 +359,8 @@ class _ProjectsListScreenState extends State<ProjectsListScreen> {
                     ),
                   ListTile(
                     leading: const Icon(Icons.history_outlined),
-                    title: const Text('Print all modifications'),
-                    subtitle: const Text('Project history with all changes'),
+                    title: Text(l10n.printAllModifications),
+                    subtitle: Text(l10n.printAllModificationsSubtitle),
                     onTap: () {
                       Navigator.pop(ctx);
                       ProjectReportPdf.export(
@@ -372,6 +382,7 @@ class _ProjectsListScreenState extends State<ProjectsListScreen> {
   @override
   Widget build(BuildContext context) {
     context.watch<LocaleProvider>();
+    final canManageProjects = !isSupervisor(context.watch<AuthProvider>().user?.role);
     return Scaffold(
       appBar: AppBar(
         title: AppSearchBar(
@@ -393,24 +404,26 @@ class _ProjectsListScreenState extends State<ProjectsListScreen> {
           ),
         ],
       ),
-      body: _buildBody(),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          final result = await Navigator.push<dynamic>(
-            context,
-            MaterialPageRoute(builder: (_) => const ProjectFormScreen()),
-          );
-          if (!mounted) return;
-          if (result is Map && result['reload'] == true) {
-            await _loadProjects();
-          }
-        },
-        child: const Icon(Icons.add),
-      ),
+      body: _buildBody(canManageProjects: canManageProjects),
+      floatingActionButton: canManageProjects
+          ? FloatingActionButton(
+              onPressed: () async {
+                final result = await Navigator.push<dynamic>(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ProjectFormScreen()),
+                );
+                if (!mounted) return;
+                if (result is Map && result['reload'] == true) {
+                  await _loadProjects();
+                }
+              },
+              child: const Icon(Icons.add),
+            )
+          : null,
     );
   }
 
-  Widget _buildBody() {
+  Widget _buildBody({required bool canManageProjects}) {
     if (_loading && _projects.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -418,7 +431,13 @@ class _ProjectsListScreenState extends State<ProjectsListScreen> {
       return ConnectionErrorWidget(message: _error!, onRetry: _loadProjects);
     }
     if (_projects.isEmpty) {
-      return Center(child: Text(AppLocalizations.of(context)!.noProjectsTapAdd));
+      return Center(
+        child: Text(
+          canManageProjects
+              ? AppLocalizations.of(context)!.noProjectsTapAdd
+              : AppLocalizations.of(context)!.noProjectsMatch,
+        ),
+      );
     }
     final l10n = AppLocalizations.of(context)!;
     final items = _filteredProjects(context);
@@ -483,7 +502,7 @@ class _ProjectsListScreenState extends State<ProjectsListScreen> {
                 onSelected: (value) async {
                   if (value == 'display') {
                     _showProjectDetails(project);
-                  } else if (value == 'edit') {
+                  } else if (value == 'edit' && canManageProjects) {
                     final result = await Navigator.push<dynamic>(
                       context,
                       MaterialPageRoute(
@@ -494,7 +513,7 @@ class _ProjectsListScreenState extends State<ProjectsListScreen> {
                     if (result is Map && result['reload'] == true) {
                       await _loadProjects();
                     }
-                  } else if (value == 'delete') {
+                  } else if (value == 'delete' && canManageProjects) {
                     await _deleteProject(project);
                   }
                 },
@@ -511,26 +530,28 @@ class _ProjectsListScreenState extends State<ProjectsListScreen> {
                         ],
                       ),
                     ),
-                    PopupMenuItem(
-                      value: 'edit',
-                      child: Row(
-                        children: [
-                          const Icon(Icons.edit),
-                          const SizedBox(width: 8),
-                          Text(l10n.edit),
-                        ],
+                    if (canManageProjects) ...[
+                      PopupMenuItem(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            const Icon(Icons.edit),
+                            const SizedBox(width: 8),
+                            Text(l10n.edit),
+                          ],
+                        ),
                       ),
-                    ),
-                    PopupMenuItem(
-                      value: 'delete',
-                      child: Row(
-                        children: [
-                          const Icon(Icons.delete, color: Colors.red),
-                          const SizedBox(width: 8),
-                          Text(l10n.delete, style: const TextStyle(color: Colors.red)),
-                        ],
+                      PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            const Icon(Icons.delete, color: Colors.red),
+                            const SizedBox(width: 8),
+                            Text(l10n.delete, style: const TextStyle(color: Colors.red)),
+                          ],
+                        ),
                       ),
-                    ),
+                    ],
                   ];
                 },
               ),

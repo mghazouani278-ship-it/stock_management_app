@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { getFirestore } = require('../firebase');
 const { admin } = require('../firebase');
-const { protect, authorize } = require('../middleware/auth');
+const {protect, authorize, authorizeAdminLike} = require('../middleware/auth');
 const updateStock = require('../utils/updateStock');
 
 function parseQuantityInput(v) {
@@ -96,7 +96,7 @@ router.get('/:id', protect, async (req, res) => {
   }
 });
 
-router.post('/', protect, authorize('admin'), async (req, res) => {
+router.post('/', protect, authorizeAdminLike, async (req, res) => {
   try {
     const { name, nameAr, name_ar, image, category, categories, categoryAr, category_ar, unit, manufacturer, distributor, status, stores, depots, availableColorsAr, available_colors_ar } = req.body;
     if (!name || !unit) return res.status(400).json({ success: false, message: 'Please provide name and unit' });
@@ -158,7 +158,7 @@ router.post('/', protect, authorize('admin'), async (req, res) => {
   }
 });
 
-router.put('/:id', protect, authorize('admin'), async (req, res) => {
+router.put('/:id', protect, authorizeAdminLike, async (req, res) => {
   try {
     const { name, nameAr, name_ar, image, category, categories, categoryAr, category_ar, unit, manufacturer, distributor, status, depots, availableColorsAr, available_colors_ar } = req.body;
     const firestore = getFirestore();
@@ -225,7 +225,7 @@ router.put('/:id', protect, authorize('admin'), async (req, res) => {
   }
 });
 
-router.delete('/:id', protect, authorize('admin'), async (req, res) => {
+router.delete('/:id', protect, authorizeAdminLike, async (req, res) => {
   try {
     const firestore = getFirestore();
     const ref = firestore.collection('products').doc(req.params.id);
@@ -238,7 +238,7 @@ router.delete('/:id', protect, authorize('admin'), async (req, res) => {
   }
 });
 
-router.post('/:id/assign-store', protect, authorize('admin'), async (req, res) => {
+router.post('/:id/assign-store', protect, authorizeAdminLike, async (req, res) => {
   try {
     const { storeId, depotId, quantity } = req.body;
     const sid = storeId || depotId;

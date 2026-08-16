@@ -6,6 +6,7 @@ import '../../widgets/connection_error_widget.dart';
 import '../../utils/embedded_ref_localized.dart';
 import '../../utils/l10n_ui_helpers.dart';
 import '../../utils/product_localized.dart';
+import '../../utils/project_localized.dart';
 
 /// Warehouse view: supplementary requests in red (read-only, no approve/refuse)
 class WarehouseSupplementaryRequestsScreen extends StatefulWidget {
@@ -247,8 +248,14 @@ class _WarehouseSupplementaryRequestsScreenState extends State<WarehouseSuppleme
                   ..._statusNotifications.map((n) {
                     final status = n['status'] as String? ?? '';
                     final isApproved = status == 'approved';
-                    final projectName = n['projectName'] ?? '';
-                    final userName = n['userName'] ?? '';
+                    final projectName = localizedProjectName(
+                      context,
+                      (n['projectName'] ?? '').toString(),
+                    );
+                    final userName = localizedDisplayUserName(
+                      context,
+                      (n['userName'] ?? '').toString(),
+                    );
                     final productSummary = n['productSummary'] ?? '';
                     return Card(
                       margin: const EdgeInsets.only(bottom: 8),
@@ -299,11 +306,11 @@ class _WarehouseSupplementaryRequestsScreenState extends State<WarehouseSuppleme
                 child: Icon(req.status == 'pending' ? Icons.pending : req.status == 'approved' ? Icons.check : Icons.close, color: Colors.white, size: 20),
               ),
               title: Text(
-                req.project?.displayName(context) ?? 'Request',
+                req.project?.displayName(context) ?? AppLocalizations.of(context)!.requestLabel,
                 style: TextStyle(fontWeight: FontWeight.bold, color: req.status == 'pending' ? Colors.red.shade900 : null),
               ),
               subtitle: Text(
-                '${req.user == null ? AppLocalizations.of(context)!.userFallback : localizedDisplayUserName(context, req.user!.name, nameAr: req.user!.nameAr)} • ${req.status}',
+                '${req.user == null ? AppLocalizations.of(context)!.userFallback : localizedDisplayUserName(context, req.user!.name, nameAr: req.user!.nameAr)} • ${localizedUiStatus(context, req.status)}',
                 style: TextStyle(color: req.status == 'pending' ? Colors.red.shade700 : null),
               ),
               trailing: const Icon(Icons.chevron_right),

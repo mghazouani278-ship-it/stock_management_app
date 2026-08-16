@@ -4,7 +4,7 @@ const { getFirestore } = require('../firebase');
 const { admin } = require('../firebase');
 const updateStock = require('../utils/updateStock');
 const { variantSegmentForStockDocId } = require('../utils/stockColors');
-const { protect, authorize, authorizeAdminOrWarehouse } = require('../middleware/auth');
+const {protect, authorize, authorizeAdminOrWarehouse, authorizeAdminLike, authorizeStockRead} = require('../middleware/auth');
 const { projectRef, storeRef, userRef } = require('../utils/embedRefs');
 
 /** JSON number or string with `,` or `.` as decimal separator (e.g. m² quantities: 2,01). */
@@ -141,7 +141,7 @@ async function stockToApi(doc, firestore) {
   };
 }
 
-router.get('/notifications', protect, authorize('admin'), async (req, res) => {
+router.get('/notifications', protect, authorizeAdminLike, async (req, res) => {
   try {
     const firestore = getFirestore();
     const snapshot = await firestore.collection('stock_notifications').orderBy('created_at', 'desc').limit(50).get();
@@ -171,7 +171,7 @@ router.get('/notifications', protect, authorize('admin'), async (req, res) => {
   }
 });
 
-router.get('/notifications-count', protect, authorize('admin'), async (req, res) => {
+router.get('/notifications-count', protect, authorizeAdminLike, async (req, res) => {
   try {
     const firestore = getFirestore();
     const snapshot = await firestore.collection('stock_notifications').where('read', '==', false).get();
@@ -181,7 +181,7 @@ router.get('/notifications-count', protect, authorize('admin'), async (req, res)
   }
 });
 
-router.put('/notifications-read', protect, authorize('admin'), async (req, res) => {
+router.put('/notifications-read', protect, authorizeAdminLike, async (req, res) => {
   try {
     const firestore = getFirestore();
     const snapshot = await firestore.collection('stock_notifications').where('read', '==', false).get();
@@ -195,7 +195,7 @@ router.put('/notifications-read', protect, authorize('admin'), async (req, res) 
 });
 
 /** Nombre de produits distincts ayant au moins une ligne en stock (admin dashboard). */
-router.get('/distinct-products-count', protect, authorize('admin'), async (req, res) => {
+router.get('/distinct-products-count', protect, authorizeAdminLike, async (req, res) => {
   try {
     const firestore = getFirestore();
     const snapshot = await firestore.collection('stock').select('product_id').get();
@@ -232,7 +232,7 @@ async function stockDocsForLocation(firestore, locationId) {
   return [...merged.values()].sort((a, b) => ms(b) - ms(a));
 }
 
-router.get('/', protect, authorizeAdminOrWarehouse, async (req, res) => {
+router.get('/', protect, authorizeStockRead, async (req, res) => {
   try {
     const firestore = getFirestore();
     const locationId = req.query.store || req.query.depot;
@@ -255,7 +255,7 @@ router.get('/', protect, authorizeAdminOrWarehouse, async (req, res) => {
   }
 });
 
-router.get('/history', protect, authorizeAdminOrWarehouse, async (req, res) => {
+router.get('/history', protect, authorizeStockRead, async (req, res) => {
   try {
     const firestore = getFirestore();
     let q = firestore.collection('stock_history').orderBy('created_at', 'desc').limit(1000);
@@ -339,7 +339,7 @@ router.post('/', protect, authorizeAdminOrWarehouse, async (req, res) => {
   }
 });
 
-router.put('/:id', protect, authorize('admin'), async (req, res) => {
+router.put('/:id', protect, authorizeAdminLike, async (req, res) => {
   try {
     const { quantity, productId: bodyProductId, storeId: bodyStoreId, depotId: bodyDepotId, variant: bodyVariant, color: bodyColor } = req.body;
     if (quantity === undefined) return res.status(400).json({ success: false, message: 'Please provide a valid quantity (>= 0)' });
@@ -417,7 +417,7 @@ router.put('/:id', protect, authorize('admin'), async (req, res) => {
   }
 });
 
-router.delete('/:id', protect, authorize('admin'), async (req, res) => {
+router.delete('/:id', protect, authorizeAdminLike, async (req, res) => {
   try {
     const firestore = getFirestore();
     const ref = firestore.collection('stock').doc(req.params.id);

@@ -89,10 +89,54 @@ class AppLocalizationsAr extends AppLocalizations {
   String get searchReportHint => 'بحث في التقرير...';
 
   @override
-  String get reportValidatedDistributions => 'التوزيعات المصدّقة';
+  String get reportValidatedDistributions => 'استلام التسليم';
 
   @override
-  String get reportValidatedDistributionsMenu => 'توزيعات\nمصدّقة';
+  String get reportValidatedDistributionsMenu => 'استلام\nالتسليم';
+
+  @override
+  String get reportTakingDelivery => 'استلام التسليم';
+
+  @override
+  String get takingDeliveryProjectCreated => 'تاريخ إنشاء المشروع';
+
+  @override
+  String get takingDeliveryProjectOwner => 'مالك المشروع';
+
+  @override
+  String get takingDeliveryQtyDistributed => 'الكمية الموزعة';
+
+  @override
+  String get takingDeliveryQtyRemaining => 'الكمية المتبقية';
+
+  @override
+  String get takingDeliveryReplacements => 'استبدالات المنتجات';
+
+  @override
+  String get takingDeliveryTimeline => 'الجدول الزمني للطلب';
+
+  @override
+  String get takingDeliveryUserOrderDate => 'تاريخ طلب المستخدم';
+
+  @override
+  String get takingDeliverySupervisorToAdmin => 'المشرف أرسل إلى المسؤول';
+
+  @override
+  String get takingDeliveryAdminToManager => 'المسؤول أرسل إلى المدير';
+
+  @override
+  String get takingDeliveryManagerApproved => 'موافقة المدير';
+
+  @override
+  String get takingDeliveryWarehouseDistributed => 'تاريخ توزيع المستودع';
+
+  @override
+  String get takingDeliveryArrivedAtUser => 'الوصول للمستخدم';
+
+  @override
+  String takingDeliveryArrivalAt(String name) {
+    return 'الوصول عند $name';
+  }
 
   @override
   String get reportApprovedReturns => 'المرتجعات المعتمدة';
@@ -111,6 +155,197 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get reportProjectsMenu => 'المشاريع';
+
+  @override
+  String get procurementPlanning => 'تخطيط المشتريات';
+
+  @override
+  String get procurementPlanningMenu => 'تخطيط\nالمشتريات';
+
+  @override
+  String get procurementColRequiredPerProject => 'الكمية المطلوبة / المشروع';
+
+  @override
+  String get procurementColTotalRequired => 'إجمالي الكمية المطلوبة';
+
+  @override
+  String get procurementColRemaining => 'المتبقي للتوريد';
+
+  @override
+  String get procurementColWarehouseStock => 'مخزون المستودع';
+
+  @override
+  String get procurementColQtyToPurchase => 'الكمية للشراء';
+
+  @override
+  String get procurementColTotalRequiredShort => 'الإجمالي المطلوب';
+
+  @override
+  String get procurementColRemainingShort => 'المتبقي';
+
+  @override
+  String get procurementColWhStockShort => 'مخزون المستودع';
+
+  @override
+  String get procurementColToPurchaseShort => 'للشراء';
+
+  @override
+  String get procurementSearchHint => 'بحث الاسم / SKU / الفئة';
+
+  @override
+  String get procurementAllStatuses => 'كل الحالات';
+
+  @override
+  String get procurementStatusInStock => 'متوفر';
+
+  @override
+  String get procurementStatusPartial => 'متاح جزئياً';
+
+  @override
+  String get procurementStatusPurchaseRequired => 'يلزم الشراء';
+
+  @override
+  String get procurementAllWarehouses => 'كل المستودعات';
+
+  @override
+  String get procurementAllProjects => 'كل المشاريع';
+
+  @override
+  String procurementProjectsCount(int count) {
+    return '$count مشاريع';
+  }
+
+  @override
+  String get procurementApply => 'تطبيق';
+
+  @override
+  String get procurementRefresh => 'تحديث';
+
+  @override
+  String get procurementPrintPdf => 'طباعة PDF';
+
+  @override
+  String procurementLastCalculated(String when, int count) {
+    return 'آخر حساب: $when  •  $count منتجات';
+  }
+
+  @override
+  String procurementSelectedCount(int count) {
+    return '$count محدد';
+  }
+
+  @override
+  String get procurementSwipeHint =>
+      'اسحب أفقياً لرؤية كل الأعمدة، أو استخدم بطاقات العرض أدناه.';
+
+  @override
+  String get procurementFullTable => 'الجدول الكامل (اسحب أفقياً)';
+
+  @override
+  String get procurementAllProducts => 'كل المنتجات';
+
+  @override
+  String procurementCurrentPageCount(int count) {
+    return 'الصفحة الحالية ($count)';
+  }
+
+  @override
+  String get procurementSelectedProducts => 'المنتجات المحددة';
+
+  @override
+  String get procurementSelectRowsFirst =>
+      'حدد الصفوف أولاً باستخدام خانات الاختيار';
+
+  @override
+  String get procurementByProject => 'حسب المشروع';
+
+  @override
+  String get procurementChooseOneProject => 'اختر مشروعاً واحداً';
+
+  @override
+  String get procurementExportExcel => 'تصدير Excel (CSV)';
+
+  @override
+  String get procurementNoProjects => 'لا توجد مشاريع متاحة';
+
+  @override
+  String get procurementPrintByProject => 'طباعة حسب المشروع';
+
+  @override
+  String get procurementNoRowsToPrint => 'لا توجد صفوف للطباعة';
+
+  @override
+  String get procurementExcelCopied =>
+      'تم نسخ Excel/CSV إلى الحافظة — الصق في Excel';
+
+  @override
+  String get procurementFilterProjects => 'تصفية المشاريع';
+
+  @override
+  String get procurementClear => 'مسح';
+
+  @override
+  String get procurementNoData => 'لا توجد بيانات للمرشحات المحددة';
+
+  @override
+  String get procurementLoadFailed => 'فشل تحميل تخطيط المشتريات';
+
+  @override
+  String procurementPageOf(int page, int total) {
+    return 'صفحة $page / $total';
+  }
+
+  @override
+  String get procurementTotalsProducts => 'المنتجات';
+
+  @override
+  String get procurementTotalsTotalRequired => 'الإجمالي المطلوب';
+
+  @override
+  String get procurementTotalsRemaining => 'المتبقي';
+
+  @override
+  String get procurementTotalsWarehouseStock => 'مخزون المستودع';
+
+  @override
+  String get procurementTotalsToPurchase => 'للشراء';
+
+  @override
+  String procurementPdfSelectedSubtitle(int count) {
+    return 'المنتجات المحددة ($count)';
+  }
+
+  @override
+  String procurementPdfAllSubtitle(int count) {
+    return 'كل المنتجات ($count)';
+  }
+
+  @override
+  String procurementPdfByProject(String name) {
+    return 'حسب المشروع: $name';
+  }
+
+  @override
+  String procurementPdfPrintedBy(String name, String when) {
+    return 'طُبع بواسطة: $name  |  $when';
+  }
+
+  @override
+  String procurementPdfFilters(String summary) {
+    return 'المرشحات: $summary';
+  }
+
+  @override
+  String get procurementPdfTotals => 'الإجماليات';
+
+  @override
+  String get procurementPdfNoProductsForProject =>
+      'لا توجد منتجات لهذا المشروع.';
+
+  @override
+  String procurementPdfPage(int page, int total) {
+    return 'صفحة $page / $total';
+  }
 
   @override
   String get reportExportProjectPdf => 'تصدير PDF';
@@ -302,6 +537,18 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get approve => 'موافقة';
+
+  @override
+  String get sendToAdmin => 'إرسال إلى المسؤول';
+
+  @override
+  String get sendToManager => 'إرسال إلى المدير';
+
+  @override
+  String get editOrder => 'تعديل الطلب';
+
+  @override
+  String get orderUpdated => 'تم تحديث الطلب';
 
   @override
   String get validate => 'تحقق';
@@ -527,7 +774,7 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String orderQtySupplementaryBreakdown(
       int remaining, int supplementary, int total, String unit) {
-    return '$remaining متبقي + $supplementary إضافي → المجموع $total $unit';
+    return '$remaining $unit + $supplementary إضافي';
   }
 
   @override
@@ -549,7 +796,7 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get approvedQuantities => 'الكميات المعتمدة (من المسؤول):';
+  String get approvedQuantities => 'الكميات المعتمدة (من المدير):';
 
   @override
   String get noProductsLabel => 'لا توجد منتجات';
@@ -695,6 +942,44 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get roleWarehouse => 'مستخدم المستودع';
+
+  @override
+  String get roleManager => 'مدير';
+
+  @override
+  String get roleSupervisor => 'مشرف';
+
+  @override
+  String get roleFinance => 'مالية';
+
+  @override
+  String get passwordOptional => 'كلمة المرور (اختياري)';
+
+  @override
+  String get printFullProjectPdf => 'طباعة ملف المشروع الكامل';
+
+  @override
+  String get printCreationDate => 'طباعة تاريخ الإنشاء';
+
+  @override
+  String printProjectUpdateNumber(int index) {
+    return 'طباعة تحديث المشروع #$index';
+  }
+
+  @override
+  String get printAllModifications => 'طباعة كل التعديلات';
+
+  @override
+  String get printAllModificationsSubtitle => 'سجل المشروع مع جميع التغييرات';
+
+  @override
+  String get orderResubmitted => 'تم إعادة إرسال الطلب';
+
+  @override
+  String get resubmitToSupervisor => 'إعادة الإرسال إلى المشرف';
+
+  @override
+  String get couldNotReadImage => 'تعذر قراءة بيانات الصورة. جرّب ملفاً آخر.';
 
   @override
   String get none => '-- لا يوجد --';
@@ -891,6 +1176,15 @@ class AppLocalizationsAr extends AppLocalizations {
   String get requestedBoq => 'مطلوب (جدول الكميات)';
 
   @override
+  String get requestedQuantityLabel => 'الكمية المطلوبة';
+
+  @override
+  String get qtyAddedByAdminLabel => 'الكمية المضافة من المسؤول';
+
+  @override
+  String get remainingRequestedLabel => 'الكمية المطلوبة المتبقية';
+
+  @override
   String get projectQuantitiesNotStockHint =>
       'كميات المشروع / جدول الكميات — وليست مخزون المستودع.';
 
@@ -1036,6 +1330,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get appTitle => 'إدارة المخزون';
 
   @override
+  String get brandName => 'إيجبت جريد';
+
+  @override
   String get noItemsMatchSearch => 'لا تتطابق العناصر مع البحث.';
 
   @override
@@ -1142,6 +1439,51 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get orderDateRequired => 'تاريخ الطلب *';
+
+  @override
+  String get expectedArrivalDaysRequired => 'الوصول للمستخدم خلال *';
+
+  @override
+  String arrivalWithinDays(int days) {
+    return '$days يوم/أيام';
+  }
+
+  @override
+  String expectedArrivalColumn(int days) {
+    return 'الوصول خلال: $days يوم/أيام';
+  }
+
+  @override
+  String expectedArrivalDateValue(String date) {
+    return 'الوصول المتوقع: $date';
+  }
+
+  @override
+  String orderDistributionDateValue(String date) {
+    return 'تاريخ التوزيع: $date';
+  }
+
+  @override
+  String orderArrivalDateValue(String date) {
+    return 'تاريخ الوصول: $date';
+  }
+
+  @override
+  String orderLateByDays(int days) {
+    return 'الطلب متأخر بـ $days يوم/أيام';
+  }
+
+  @override
+  String get confirmOrderArrived => 'تأكيد وصول الطلب';
+
+  @override
+  String get orderArrivedSuccess => 'وصل الطلب بنجاح';
+
+  @override
+  String get orderArrivedConfirmed => 'تم إرسال تأكيد الوصول';
+
+  @override
+  String get orderArrivedNotification => 'وصل الطلب بنجاح';
 
   @override
   String noItemsFound(String type) {
@@ -1254,7 +1596,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get whenAdminApprovesOrderHint =>
-      'عندما يوافق المسؤول على طلب، سيظهر هنا مع الكميات.\nاستخدم + لإنشاء توزيع يدوياً.';
+      'عندما يوافق المدير على طلب، سيظهر هنا مع الكميات.\nاستخدم + لإنشاء توزيع يدوياً.';
 
   @override
   String orderNumberPrefix(String prefix) {
@@ -1476,4 +1818,57 @@ class AppLocalizationsAr extends AppLocalizations {
   String maxQtyHintNumber(String max) {
     return 'الحد الأقصى: $max';
   }
+
+  @override
+  String get insufficientStockReplacePrompt =>
+      'المخزون غير كافٍ. هل تريد استبدال هذا المنتج بمنتج واحد أو أكثر؟';
+
+  @override
+  String get outOfStock => 'غير متوفر في المخزون';
+
+  @override
+  String get replaceProduct => 'استبدال المنتج';
+
+  @override
+  String get productReplacedSuccessfully => 'تم استبدال المنتج بنجاح';
+
+  @override
+  String get selectReplacementProduct => 'اختر منتج/منتجات الاستبدال';
+
+  @override
+  String get noProductsWithStock => 'لا توجد منتجات بمخزون متاح.';
+
+  @override
+  String get originalProduct => 'المنتج الأصلي';
+
+  @override
+  String get replacedByProduct => 'استُبدل بـ';
+
+  @override
+  String get replacementDate => 'تاريخ الاستبدال';
+
+  @override
+  String get replacedByAdmin => 'تم الاستبدال بواسطة';
+
+  @override
+  String get skuLabel => 'رمز المنتج';
+
+  @override
+  String get availableQuantityLabel => 'الكمية المتاحة';
+
+  @override
+  String replacementAssignedQty(String assigned, String required) {
+    return 'المخصص: $assigned / $required';
+  }
+
+  @override
+  String get confirmReplacements => 'تأكيد الاستبدال';
+
+  @override
+  String replacementQtyMustMatch(String required) {
+    return 'يجب أن تساوي كمية الاستبدال الإجمالية $required.';
+  }
+
+  @override
+  String get changeReplacement => 'تعديل الاستبدال';
 }

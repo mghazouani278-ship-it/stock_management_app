@@ -3,7 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const { protect, authorize } = require('../middleware/auth');
+const {protect, authorize, authorizeAdminLike} = require('../middleware/auth');
 
 const uploadsDir = path.join(__dirname, '../uploads');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
@@ -32,7 +32,7 @@ const upload = multer({
   },
 });
 
-router.post('/image', protect, authorize('admin'), upload.single('image'), (req, res) => {
+router.post('/image', protect, authorizeAdminLike, upload.single('image'), (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, message: 'No image file provided' });
     let baseUrl = process.env.BASE_URL || `http://127.0.0.1:${process.env.PORT || 5000}`;

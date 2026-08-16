@@ -40,14 +40,147 @@
   "searchReportsHint": "بحث التقارير...",
   "noReportTypesMatchSearch": "لا يوجد نوع تقرير يطابق البحث.",
   "searchReportHint": "بحث في التقرير...",
-  "reportValidatedDistributions": "التوزيعات المصدّقة",
-  "reportValidatedDistributionsMenu": "توزيعات\nمصدّقة",
+  "reportValidatedDistributions": "استلام التسليم",
+  "reportValidatedDistributionsMenu": "استلام\nالتسليم",
+  "reportTakingDelivery": "استلام التسليم",
+  "takingDeliveryProjectCreated": "تاريخ إنشاء المشروع",
+  "takingDeliveryProjectOwner": "مالك المشروع",
+  "takingDeliveryQtyDistributed": "الكمية الموزعة",
+  "takingDeliveryQtyRemaining": "الكمية المتبقية",
+  "takingDeliveryReplacements": "استبدالات المنتجات",
+  "takingDeliveryTimeline": "الجدول الزمني للطلب",
+  "takingDeliveryUserOrderDate": "تاريخ طلب المستخدم",
+  "takingDeliverySupervisorToAdmin": "المشرف أرسل إلى المسؤول",
+  "takingDeliveryAdminToManager": "المسؤول أرسل إلى المدير",
+  "takingDeliveryManagerApproved": "موافقة المدير",
+  "takingDeliveryWarehouseDistributed": "تاريخ توزيع المستودع",
+  "takingDeliveryArrivedAtUser": "الوصول للمستخدم",
+  "takingDeliveryArrivalAt": "الوصول عند {name}",
+  "@takingDeliveryArrivalAt": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
   "reportApprovedReturns": "المرتجعات المعتمدة",
   "reportApprovedReturnsMenu": "مرتجعات\nمعتمدة",
   "reportStockHistory": "سجل المخزون",
   "reportStockHistoryMenu": "سجل\nالمخزون",
   "reportProjects": "المشاريع",
   "reportProjectsMenu": "المشاريع",
+  "procurementPlanning": "تخطيط المشتريات",
+  "procurementPlanningMenu": "تخطيط\nالمشتريات",
+  "procurementColRequiredPerProject": "الكمية المطلوبة / المشروع",
+  "procurementColTotalRequired": "إجمالي الكمية المطلوبة",
+  "procurementColRemaining": "المتبقي للتوريد",
+  "procurementColWarehouseStock": "مخزون المستودع",
+  "procurementColQtyToPurchase": "الكمية للشراء",
+  "procurementColTotalRequiredShort": "الإجمالي المطلوب",
+  "procurementColRemainingShort": "المتبقي",
+  "procurementColWhStockShort": "مخزون المستودع",
+  "procurementColToPurchaseShort": "للشراء",
+  "procurementSearchHint": "بحث الاسم / SKU / الفئة",
+  "procurementAllStatuses": "كل الحالات",
+  "procurementStatusInStock": "متوفر",
+  "procurementStatusPartial": "متاح جزئياً",
+  "procurementStatusPurchaseRequired": "يلزم الشراء",
+  "procurementAllWarehouses": "كل المستودعات",
+  "procurementAllProjects": "كل المشاريع",
+  "procurementProjectsCount": "{count} مشاريع",
+  "@procurementProjectsCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "procurementApply": "تطبيق",
+  "procurementRefresh": "تحديث",
+  "procurementPrintPdf": "طباعة PDF",
+  "procurementLastCalculated": "آخر حساب: {when}  •  {count} منتجات",
+  "@procurementLastCalculated": {
+    "placeholders": {
+      "when": {"type": "String"},
+      "count": {"type": "int"}
+    }
+  },
+  "procurementSelectedCount": "{count} محدد",
+  "@procurementSelectedCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "procurementSwipeHint": "اسحب أفقياً لرؤية كل الأعمدة، أو استخدم بطاقات العرض أدناه.",
+  "procurementFullTable": "الجدول الكامل (اسحب أفقياً)",
+  "procurementAllProducts": "كل المنتجات",
+  "procurementCurrentPageCount": "الصفحة الحالية ({count})",
+  "@procurementCurrentPageCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "procurementSelectedProducts": "المنتجات المحددة",
+  "procurementSelectRowsFirst": "حدد الصفوف أولاً باستخدام خانات الاختيار",
+  "procurementByProject": "حسب المشروع",
+  "procurementChooseOneProject": "اختر مشروعاً واحداً",
+  "procurementExportExcel": "تصدير Excel (CSV)",
+  "procurementNoProjects": "لا توجد مشاريع متاحة",
+  "procurementPrintByProject": "طباعة حسب المشروع",
+  "procurementNoRowsToPrint": "لا توجد صفوف للطباعة",
+  "procurementExcelCopied": "تم نسخ Excel/CSV إلى الحافظة — الصق في Excel",
+  "procurementFilterProjects": "تصفية المشاريع",
+  "procurementClear": "مسح",
+  "procurementNoData": "لا توجد بيانات للمرشحات المحددة",
+  "procurementLoadFailed": "فشل تحميل تخطيط المشتريات",
+  "procurementPageOf": "صفحة {page} / {total}",
+  "@procurementPageOf": {
+    "placeholders": {
+      "page": {"type": "int"},
+      "total": {"type": "int"}
+    }
+  },
+  "procurementTotalsProducts": "المنتجات",
+  "procurementTotalsTotalRequired": "الإجمالي المطلوب",
+  "procurementTotalsRemaining": "المتبقي",
+  "procurementTotalsWarehouseStock": "مخزون المستودع",
+  "procurementTotalsToPurchase": "للشراء",
+  "procurementPdfSelectedSubtitle": "المنتجات المحددة ({count})",
+  "@procurementPdfSelectedSubtitle": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "procurementPdfAllSubtitle": "كل المنتجات ({count})",
+  "@procurementPdfAllSubtitle": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "procurementPdfByProject": "حسب المشروع: {name}",
+  "@procurementPdfByProject": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "procurementPdfPrintedBy": "طُبع بواسطة: {name}  |  {when}",
+  "@procurementPdfPrintedBy": {
+    "placeholders": {
+      "name": {"type": "String"},
+      "when": {"type": "String"}
+    }
+  },
+  "procurementPdfFilters": "المرشحات: {summary}",
+  "@procurementPdfFilters": {
+    "placeholders": {
+      "summary": {"type": "String"}
+    }
+  },
+  "procurementPdfTotals": "الإجماليات",
+  "procurementPdfNoProductsForProject": "لا توجد منتجات لهذا المشروع.",
+  "procurementPdfPage": "صفحة {page} / {total}",
+  "@procurementPdfPage": {
+    "placeholders": {
+      "page": {"type": "int"},
+      "total": {"type": "int"}
+    }
+  },
   "reportExportProjectPdf": "تصدير PDF",
   "projectSavedShort": "تم حفظ المشروع",
   "quantityRest": "الباقي",
@@ -117,6 +250,10 @@
   "refuseDistribution": "رفض التوزيع",
   "validateDistribution": "التحقق من التوزيع",
   "approve": "موافقة",
+  "sendToAdmin": "إرسال إلى المسؤول",
+  "sendToManager": "إرسال إلى المدير",
+  "editOrder": "تعديل الطلب",
+  "orderUpdated": "تم تحديث الطلب",
   "validate": "تحقق",
   "refuse": "رفض",
 
@@ -198,7 +335,7 @@
       "unit": {"type": "String"}
     }
   },
-  "orderQtySupplementaryBreakdown": "{remaining} متبقي + {supplementary} إضافي → المجموع {total} {unit}",
+  "orderQtySupplementaryBreakdown": "{remaining} {unit} + {supplementary} إضافي",
   "@orderQtySupplementaryBreakdown": {
     "placeholders": {
       "remaining": {"type": "int"},
@@ -211,7 +348,7 @@
   "orderDateValue": "تاريخ الطلب: {date}",
   "projectLabel": "المشروع: {name}",
   "userLabel": "المستخدم: {name}",
-  "approvedQuantities": "الكميات المعتمدة (من المسؤول):",
+  "approvedQuantities": "الكميات المعتمدة (من المدير):",
   "noProductsLabel": "لا توجد منتجات",
   "myOrders": "طلباتي",
   "newOrder": "طلب جديد",
@@ -258,6 +395,23 @@
   "roleUser": "مستخدم",
   "roleAdmin": "مسؤول",
   "roleWarehouse": "مستخدم المستودع",
+  "roleManager": "مدير",
+  "roleSupervisor": "مشرف",
+  "roleFinance": "مالية",
+  "passwordOptional": "كلمة المرور (اختياري)",
+  "printFullProjectPdf": "طباعة ملف المشروع الكامل",
+  "printCreationDate": "طباعة تاريخ الإنشاء",
+  "printProjectUpdateNumber": "طباعة تحديث المشروع #{index}",
+  "@printProjectUpdateNumber": {
+    "placeholders": {
+      "index": {"type": "int"}
+    }
+  },
+  "printAllModifications": "طباعة كل التعديلات",
+  "printAllModificationsSubtitle": "سجل المشروع مع جميع التغييرات",
+  "orderResubmitted": "تم إعادة إرسال الطلب",
+  "resubmitToSupervisor": "إعادة الإرسال إلى المشرف",
+  "couldNotReadImage": "تعذر قراءة بيانات الصورة. جرّب ملفاً آخر.",
   "none": "-- لا يوجد --",
   "description": "الوصف",
   "owner": "المالك",
@@ -317,6 +471,9 @@
   "qtyLabel": "الكمية:",
   "requested": "مطلوب",
   "requestedBoq": "مطلوب (جدول الكميات)",
+  "requestedQuantityLabel": "الكمية المطلوبة",
+  "qtyAddedByAdminLabel": "الكمية المضافة من المسؤول",
+  "remainingRequestedLabel": "الكمية المطلوبة المتبقية",
   "projectQuantitiesNotStockHint": "كميات المشروع / جدول الكميات — وليست مخزون المستودع.",
   "distributed": "موزع",
   "stockRecordDeleted": "تم حذف سجل المخزون",
@@ -381,6 +538,7 @@
   "editStore": "تعديل المتجر",
 
   "appTitle": "إدارة المخزون",
+  "brandName": "إيجبت جريد",
   "noItemsMatchSearch": "لا تتطابق العناصر مع البحث.",
   "materialRequestLabel": "طلب المواد:",
   "andMore": "... والمزيد",
@@ -415,6 +573,47 @@
   "stockChange": "تغيير المخزون",
   "reportDateByUser": "تاريخ التقرير من المستخدم:",
   "orderDateRequired": "تاريخ الطلب *",
+  "expectedArrivalDaysRequired": "الوصول للمستخدم خلال *",
+  "arrivalWithinDays": "{days} يوم/أيام",
+  "@arrivalWithinDays": {
+    "placeholders": {
+      "days": {"type": "int"}
+    }
+  },
+  "expectedArrivalColumn": "الوصول خلال: {days} يوم/أيام",
+  "@expectedArrivalColumn": {
+    "placeholders": {
+      "days": {"type": "int"}
+    }
+  },
+  "expectedArrivalDateValue": "الوصول المتوقع: {date}",
+  "@expectedArrivalDateValue": {
+    "placeholders": {
+      "date": {"type": "String"}
+    }
+  },
+  "orderDistributionDateValue": "تاريخ التوزيع: {date}",
+  "@orderDistributionDateValue": {
+    "placeholders": {
+      "date": {"type": "String"}
+    }
+  },
+  "orderArrivalDateValue": "تاريخ الوصول: {date}",
+  "@orderArrivalDateValue": {
+    "placeholders": {
+      "date": {"type": "String"}
+    }
+  },
+  "orderLateByDays": "الطلب متأخر بـ {days} يوم/أيام",
+  "@orderLateByDays": {
+    "placeholders": {
+      "days": {"type": "int"}
+    }
+  },
+  "confirmOrderArrived": "تأكيد وصول الطلب",
+  "orderArrivedSuccess": "وصل الطلب بنجاح",
+  "orderArrivedConfirmed": "تم إرسال تأكيد الوصول",
+  "orderArrivedNotification": "وصل الطلب بنجاح",
   "noItemsFound": "لم يتم العثور على {type}.",
   "quantityToAdd": "الكمية المطلوب إضافتها",
   "storeRequired": "المتجر *",
@@ -452,7 +651,7 @@
   "yourDamagedReportsWillAppear": "ستظهر تقاريرك هنا",
   "extraQuantityPart": "(إضافي: +{qty})",
   "noApprovedOrdersToDistribute": "لا توجد طلبات معتمدة للتوزيع",
-  "whenAdminApprovesOrderHint": "عندما يوافق المسؤول على طلب، سيظهر هنا مع الكميات.\nاستخدم + لإنشاء توزيع يدوياً.",
+  "whenAdminApprovesOrderHint": "عندما يوافق المدير على طلب، سيظهر هنا مع الكميات.\nاستخدم + لإنشاء توزيع يدوياً.",
   "orderNumberPrefix": "طلب #{prefix}...",
   "orderCardProductsSummary": "{count} منتجات • الإجمالي {total}",
   "productsRequiredLabel": "المنتجات *",
@@ -550,5 +749,32 @@
     "placeholders": {
       "max": {"type": "String"}
     }
-  }
+  },
+  "insufficientStockReplacePrompt": "المخزون غير كافٍ. هل تريد استبدال هذا المنتج بمنتج واحد أو أكثر؟",
+  "outOfStock": "غير متوفر في المخزون",
+  "replaceProduct": "استبدال المنتج",
+  "productReplacedSuccessfully": "تم استبدال المنتج بنجاح",
+  "selectReplacementProduct": "اختر منتج/منتجات الاستبدال",
+  "noProductsWithStock": "لا توجد منتجات بمخزون متاح.",
+  "originalProduct": "المنتج الأصلي",
+  "replacedByProduct": "استُبدل بـ",
+  "replacementDate": "تاريخ الاستبدال",
+  "replacedByAdmin": "تم الاستبدال بواسطة",
+  "skuLabel": "رمز المنتج",
+  "availableQuantityLabel": "الكمية المتاحة",
+  "replacementAssignedQty": "المخصص: {assigned} / {required}",
+  "@replacementAssignedQty": {
+    "placeholders": {
+      "assigned": {"type": "String"},
+      "required": {"type": "String"}
+    }
+  },
+  "confirmReplacements": "تأكيد الاستبدال",
+  "replacementQtyMustMatch": "يجب أن تساوي كمية الاستبدال الإجمالية {required}.",
+  "@replacementQtyMustMatch": {
+    "placeholders": {
+      "required": {"type": "String"}
+    }
+  },
+  "changeReplacement": "تعديل الاستبدال"
 }

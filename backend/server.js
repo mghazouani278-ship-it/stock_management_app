@@ -20,6 +20,22 @@ app.use(express.json({ type: 'application/json' }));
 app.use(express.urlencoded({ extended: true, type: 'application/x-www-form-urlencoded' }));
 
 const uploadsDir = path.join(__dirname, 'uploads');
+const publicDir = path.join(__dirname, 'public');
+const privacyPage = path.join(publicDir, 'privacy.html');
+
+function sendPrivacyPage(_req, res) {
+  res.sendFile(privacyPage);
+}
+
+function sendDeleteAccountPage(_req, res) {
+  res.sendFile(path.join(publicDir, 'delete-account.html'));
+}
+
+app.get('/privacy', sendPrivacyPage);
+app.get('/api/privacy', sendPrivacyPage);
+app.get('/delete-account', sendDeleteAccountPage);
+app.get('/api/delete-account', sendDeleteAccountPage);
+
 app.use('/uploads', (req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
@@ -82,6 +98,14 @@ async function start() {
     const PORT = process.env.PORT || 5000;
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`Server running on http://localhost:${PORT} (API: http://localhost:${PORT}/api)`);
+      // Check late orders hourly (also runs on order-notifications GET/count).
+      try {
+        const { checkAndNotifyLateOrders } = require('./routes/orderNotifications');
+        checkAndNotifyLateOrders();
+        setInterval(() => checkAndNotifyLateOrders(), 60 * 60 * 1000);
+      } catch (lateErr) {
+        console.warn('lateOrders scheduler:', lateErr.message || lateErr);
+      }
     });
   } catch (err) {
     console.error('Erreur démarrage:', err.message);

@@ -2,10 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
-import '../admin/admin_home_screen.dart';
-import '../user/user_home_screen.dart';
-import '../warehouse/warehouse_home_screen.dart';
+import '../home_router.dart';
 
 /// Connexion avec le design système [AppTheme] (titres, champs, espacements).
 class LoginScreen extends StatefulWidget {
@@ -40,26 +39,16 @@ class _LoginScreenState extends State<LoginScreen> {
     );
 
     if (success && mounted) {
-      final role = (authProvider.user?.role ?? 'user').toLowerCase().replaceAll(' ', '_');
-      if (role == 'admin') {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const AdminHomeScreen()),
-        );
-      } else if (role == 'warehouse_user' || role == 'warehouse' || role == 'warehouseuser') {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const WarehouseHomeScreen()),
-        );
-      } else {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const UserHomeScreen()),
-        );
-      }
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => homeScreenForRole(authProvider.user?.role)),
+      );
     } else if (mounted) {
       final err = authProvider.error ?? 'Login failed';
       final lower = err.toLowerCase();
       final isConnectionError = err.contains('Impossible de joindre') ||
           err.contains('start.bat') ||
           lower.contains('unable to reach') ||
+          lower.contains('check internet') ||
           lower.contains('connection refused') ||
           lower.contains('failed host lookup') ||
           lower.contains('socketexception');
@@ -126,7 +115,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: AppTheme.spaceMd),
                   Text(
-                    'Egypt Grid',
+                    l10n.brandName,
                     textAlign: TextAlign.center,
                     style: AppTheme.appTextStyle(
                       context,
@@ -248,6 +237,16 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                       );
                     },
+                  ),
+                  const SizedBox(height: AppTheme.spaceSm),
+                  Text(
+                    ApiService.baseUrl,
+                    textAlign: TextAlign.center,
+                    style: AppTheme.appTextStyle(
+                      context,
+                      fontSize: 11,
+                      color: AppTheme.textTertiary,
+                    ),
                   ),
                   const SizedBox(height: AppTheme.spaceLg),
                 ],

@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { getFirestore } = require('../firebase');
 const { admin } = require('../firebase');
-const { protect, authorize, authorizeAdminOrWarehouse } = require('../middleware/auth');
+const {protect, authorize, authorizeAdminOrWarehouse, authorizeAdminLike} = require('../middleware/auth');
 
 /** Create notification for admin when warehouse user creates a distribution (pending approval) */
 async function createDistributionNotification(firestore, { distributionId, bonAlimentation, projectName, storeName, createdBy }) {
@@ -45,7 +45,7 @@ async function createWarehouseDistributionStatusNotification(firestore, { distri
   });
 }
 
-router.get('/', protect, authorize('admin'), async (req, res) => {
+router.get('/', protect, authorizeAdminLike, async (req, res) => {
   try {
     const firestore = getFirestore();
     const snapshot = await firestore.collection('distribution_notifications').orderBy('created_at', 'desc').limit(50).get();
@@ -68,7 +68,7 @@ router.get('/', protect, authorize('admin'), async (req, res) => {
   }
 });
 
-router.get('/count', protect, authorize('admin'), async (req, res) => {
+router.get('/count', protect, authorizeAdminLike, async (req, res) => {
   try {
     const firestore = getFirestore();
     const snapshot = await firestore.collection('distribution_notifications').where('read', '==', false).get();
@@ -78,7 +78,7 @@ router.get('/count', protect, authorize('admin'), async (req, res) => {
   }
 });
 
-router.put('/read', protect, authorize('admin'), async (req, res) => {
+router.put('/read', protect, authorizeAdminLike, async (req, res) => {
   try {
     const firestore = getFirestore();
     const snapshot = await firestore.collection('distribution_notifications').where('read', '==', false).get();
@@ -161,7 +161,7 @@ router.put('/warehouse/read', protect, authorizeAdminOrWarehouse, async (req, re
 });
 
 // --- Admin: notifications when warehouse validates (effectue) a distribution ---
-router.get('/admin-completed/count', protect, authorize('admin'), async (req, res) => {
+router.get('/admin-completed/count', protect, authorizeAdminLike, async (req, res) => {
   try {
     const firestore = getFirestore();
     const snapshot = await firestore.collection('admin_distribution_completed_notifications')
@@ -173,7 +173,7 @@ router.get('/admin-completed/count', protect, authorize('admin'), async (req, re
   }
 });
 
-router.get('/admin-completed', protect, authorize('admin'), async (req, res) => {
+router.get('/admin-completed', protect, authorizeAdminLike, async (req, res) => {
   try {
     const firestore = getFirestore();
     const snapshot = await firestore.collection('admin_distribution_completed_notifications')
@@ -199,7 +199,7 @@ router.get('/admin-completed', protect, authorize('admin'), async (req, res) => 
   }
 });
 
-router.put('/admin-completed/read', protect, authorize('admin'), async (req, res) => {
+router.put('/admin-completed/read', protect, authorizeAdminLike, async (req, res) => {
   try {
     const firestore = getFirestore();
     const snapshot = await firestore.collection('admin_distribution_completed_notifications')
