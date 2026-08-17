@@ -382,7 +382,7 @@ class _ProjectsListScreenState extends State<ProjectsListScreen> {
   @override
   Widget build(BuildContext context) {
     context.watch<LocaleProvider>();
-    final canManageProjects = !isSupervisor(context.watch<AuthProvider>().user?.role);
+    final canManageProjects = isAdminLike(context.watch<AuthProvider>().user?.role);
     return Scaffold(
       appBar: AppBar(
         title: AppSearchBar(

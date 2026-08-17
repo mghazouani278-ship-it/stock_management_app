@@ -407,6 +407,8 @@
   "allProductsAdded": "All products have been added.",
   "addAtLeastOneProduct": "Add at least one product with quantity > 0",
   "orderPlacedSuccess": "Order placed successfully",
+  "orderSentToManager": "Order sent to manager for approval",
+  "orderAwaitingManagerApproval": "Waiting for manager approval",
   "placeOrder": "Place Order",
   "supplementary": "Supplementary",
   "notesLabel": "Notes: {notes}",

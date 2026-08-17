@@ -7,6 +7,7 @@ import '../../../utils/l10n_formatters.dart';
 import '../../../utils/l10n_ui_helpers.dart';
 import '../../../utils/product_localized.dart';
 import '../../../utils/project_localized.dart';
+import '../../../utils/embedded_ref_localized.dart';
 import '../../../utils/project_report_pdf.dart';
 import '../../../theme/app_theme.dart';
 import '../../../widgets/app_card.dart';
@@ -296,20 +297,69 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> with RouteAware
     );
   }
 
+  String _localizedRefName(BuildContext context, dynamic ref) {
+    if (ref is Map) {
+      return localizedProjectName(
+        context,
+        ref['name']?.toString() ?? '',
+        nameAr: ref['nameAr']?.toString() ?? ref['name_ar']?.toString(),
+      );
+    }
+    return '';
+  }
+
+  String _requestedProductsSummary(BuildContext context, Map<String, dynamic> item) {
+    final l10n = AppLocalizations.of(context)!;
+    final products = item['products'];
+    if (products is! List || products.isEmpty) return l10n.noProductsRequestedShort;
+    final parts = <String>[];
+    for (final raw in products) {
+      if (raw is! Map) continue;
+      final prod = raw['product'];
+      String name = l10n.product;
+      if (prod is Map) {
+        final n = prod['name']?.toString();
+        if (n != null && n.trim().isNotEmpty) {
+          name = localizedApiProductName(context, n);
+        }
+      } else if (raw['name'] != null && raw['name'].toString().trim().isNotEmpty) {
+        name = localizedApiProductName(context, raw['name'].toString());
+      }
+      final color = (raw['color'] ?? raw['variant'])?.toString();
+      if (color != null && color.trim().isNotEmpty) name = '$name ($color)';
+      final qty = raw['quantity'];
+      parts.add(qty != null ? '$name × $qty' : name);
+    }
+    return parts.isEmpty ? l10n.noProductsRequestedShort : parts.join(', ');
+  }
+
   String _getItemTitle(BuildContext context, Map<String, dynamic> item) {
     final l10n = AppLocalizations.of(context)!;
     switch (widget.reportType) {
       case ReportType.distributions:
-        final project = item['project']?['name'];
-        final store = item['store']?['name'];
-        if (project != null && store != null) return '$project • $store';
-        if (project != null) return project;
-        if (store != null) return store;
-        return '${l10n.distributionSingle}${item['project']?['name'] != null ? ' • ${item['project']['name']}' : ''}${item['store']?['name'] != null ? ' • ${item['store']['name']}' : ''}';
+        final project = _localizedRefName(context, item['project']);
+        final storeRef = item['store'];
+        final store = storeRef is Map
+            ? embeddedRefDisplayName(
+                context,
+                storeRef['name']?.toString() ?? '',
+                storeRef['nameAr']?.toString() ?? storeRef['name_ar']?.toString(),
+              )
+            : '';
+        if (project.isNotEmpty && store.isNotEmpty) return '$project • $store';
+        if (project.isNotEmpty) return project;
+        if (store.isNotEmpty) return store;
+        return l10n.distributionSingle;
       case ReportType.orders:
-        return '${l10n.order}${item['project']?['name'] != null ? ' • ${item['project']['name']}' : ''}${item['user']?['name'] != null ? ' • ${item['user']['name']}' : ''}';
+        final project = _localizedRefName(context, item['project']);
+        return project.isNotEmpty ? project : l10n.order;
       case ReportType.returns:
-        return '${l10n.returnItem}${item['project']?['name'] != null ? ' • ${item['project']['name']}' : ''}${item['user']?['name'] != null ? ' • ${item['user']['name']}' : ''}';
+        final project = _localizedRefName(context, item['project']);
+        final user = item['user']?['name'];
+        final bits = <String>[l10n.returnItem];
+        if (project.isNotEmpty) bits.add(project);
+        if (user != null) bits.add(user.toString());
+        return bits.join(' • ');
       case ReportType.damagedProducts:
         final pn = item['product']?['name']?.toString();
         return pn != null && pn.isNotEmpty
@@ -333,40 +383,36 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> with RouteAware
     final l10n = AppLocalizations.of(context)!;
     switch (widget.reportType) {
       case ReportType.distributions:
-        final project = item['project']?['name'];
-        final store = item['store']?['name'];
         final createdStr = L10nFormatters.formatDateFromApi(context, item['createdAt']);
         final validatedStr = L10nFormatters.formatDateFromApi(context, item['validatedAt']);
         final distStr = L10nFormatters.formatDateFromApi(context, item['distributionDate']);
-        final parts = <String>[];
-        if (project != null) parts.add(project.toString());
-        if (store != null) parts.add(store.toString());
+        final parts = <String>[
+          _requestedProductsSummary(context, item),
+        ];
         if (createdStr != null) parts.add('${l10n.createdDate} $createdStr');
         if (validatedStr != null) parts.add('${l10n.validatedDate} $validatedStr');
         if (distStr != null) parts.add('${l10n.distributionDateLabel} $distStr');
         return parts.join(' • ');
       case ReportType.orders:
-        final user = item['user']?['name'];
-        final project = item['project']?['name'];
         final createdStr = L10nFormatters.formatDateFromApi(context, item['createdAt']);
         final approvedStr = L10nFormatters.formatDateFromApi(context, item['approvedAt']);
         final distStr = L10nFormatters.formatDateFromApi(context, item['deliveryDate']);
-        final parts = <String>[];
-        if (user != null) parts.add(user.toString());
-        if (project != null) parts.add(project.toString());
+        final parts = <String>[
+          _requestedProductsSummary(context, item),
+        ];
         if (createdStr != null) parts.add('${l10n.createdDate} $createdStr');
         if (approvedStr != null) parts.add('${l10n.approvedDate} $approvedStr');
         if (distStr != null) parts.add('${l10n.distributionDateLabel} $distStr');
         return parts.join(' • ');
       case ReportType.returns:
         final user = item['user']?['name'];
-        final project = item['project']?['name'];
+        final project = _localizedRefName(context, item['project']);
         final createdStr = L10nFormatters.formatDateFromApi(context, item['createdAt']);
         final approvedStr = L10nFormatters.formatDateFromApi(context, item['approvedAt']);
         final returnStr = L10nFormatters.formatDateFromApi(context, item['createdAt']);
         final parts = <String>[];
         if (user != null) parts.add(user.toString());
-        if (project != null) parts.add(project.toString());
+        if (project.isNotEmpty) parts.add(project);
         if (createdStr != null) parts.add('${l10n.createdDate} $createdStr');
         if (approvedStr != null) parts.add('${l10n.approvedDate} $approvedStr');
         if (returnStr != null) parts.add('${l10n.returnDateByUser} $returnStr');
@@ -1141,7 +1187,18 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> with RouteAware
         if (formattedDate != null) {
           text = formattedDate;
         } else if (val.containsKey('name')) {
-          text = (val['name'] ?? '').toString();
+          final kn = key.trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+          if (kn == 'project') {
+            text = _localizedRefName(context, val);
+          } else if (kn == 'store') {
+            text = embeddedRefDisplayName(
+              context,
+              val['name']?.toString() ?? '',
+              val['nameAr']?.toString() ?? val['name_ar']?.toString(),
+            );
+          } else {
+            text = (val['name'] ?? '').toString();
+          }
         } else {
           text = val.toString();
         }
@@ -1213,40 +1270,23 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> with RouteAware
       ));
     }
 
-    // Distributions: display Material Request, created date, validated date, distribution date (when distribution happens)
-    if (widget.reportType == ReportType.distributions) {
-      final materialRequest = item['bonAlimentation'] ?? item['bon_alimentation'];
-      if (materialRequest != null && materialRequest.toString().isNotEmpty) {
-        list.add(Padding(
-          padding: const EdgeInsets.only(bottom: AppTheme.spaceSm),
-          child: Text('${l10n.materialRequestLabel} $materialRequest', style: AppTheme.appTextStyle(context, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
-        ));
-      }
-      final createdStr = L10nFormatters.formatDateFromApi(context, item['createdAt']);
-      final validatedStr = L10nFormatters.formatDateFromApi(context, item['validatedAt']);
-      final distStr = L10nFormatters.formatDateFromApi(context, item['distributionDate']);
-      if (createdStr != null) {
-        list.add(Padding(
-          padding: const EdgeInsets.only(bottom: AppTheme.spaceSm),
-          child: Text('${l10n.createdDate} $createdStr', style: AppTheme.appTextStyle(context, color: AppTheme.textPrimary)),
-        ));
-      }
-      if (validatedStr != null) {
-        list.add(Padding(
-          padding: const EdgeInsets.only(bottom: AppTheme.spaceSm),
-          child: Text('${l10n.validatedDate} $validatedStr', style: AppTheme.appTextStyle(context, color: AppTheme.textPrimary)),
-        ));
-      }
-      if (distStr != null) {
-        list.add(Padding(
-          padding: const EdgeInsets.only(bottom: AppTheme.spaceSm),
-          child: Text('${l10n.distributionDateLabel} $distStr', style: AppTheme.appTextStyle(context, color: AppTheme.textPrimary)),
-        ));
-      }
-    }
-
-    // Orders: display creation date, approved date, distribution date
+    // Orders: project name + requested products first
     if (widget.reportType == ReportType.orders) {
+      final projectName = _localizedRefName(context, item['project']);
+      if (projectName.isNotEmpty) {
+        list.add(Padding(
+          padding: const EdgeInsets.only(bottom: AppTheme.spaceSm),
+          child: Text('${l10n.project}: $projectName', style: AppTheme.appTextStyle(context, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
+        ));
+      }
+      list.add(Padding(
+        padding: const EdgeInsets.only(bottom: 4),
+        child: Text(l10n.productsLabel, style: AppTheme.appTextStyle(context, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
+      ));
+      list.add(Padding(
+        padding: const EdgeInsets.only(bottom: AppTheme.spaceSm),
+        child: Text(_requestedProductsSummary(context, item), style: AppTheme.appTextStyle(context, color: AppTheme.textPrimary)),
+      ));
       final createdStr = L10nFormatters.formatDateFromApi(context, item['createdAt']);
       final approvedStr = L10nFormatters.formatDateFromApi(context, item['approvedAt']);
       final distStr = L10nFormatters.formatDateFromApi(context, item['deliveryDate']);
@@ -1260,6 +1300,53 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> with RouteAware
         list.add(Padding(
           padding: const EdgeInsets.only(bottom: AppTheme.spaceSm),
           child: Text('${l10n.approvedDate} $approvedStr', style: AppTheme.appTextStyle(context, color: AppTheme.textPrimary)),
+        ));
+      }
+      if (distStr != null) {
+        list.add(Padding(
+          padding: const EdgeInsets.only(bottom: AppTheme.spaceSm),
+          child: Text('${l10n.distributionDateLabel} $distStr', style: AppTheme.appTextStyle(context, color: AppTheme.textPrimary)),
+        ));
+      }
+    }
+
+    // Distributions: display Material Request, project, requested products, dates
+    if (widget.reportType == ReportType.distributions) {
+      final materialRequest = item['bonAlimentation'] ?? item['bon_alimentation'];
+      if (materialRequest != null && materialRequest.toString().isNotEmpty) {
+        list.add(Padding(
+          padding: const EdgeInsets.only(bottom: AppTheme.spaceSm),
+          child: Text('${l10n.materialRequestLabel} $materialRequest', style: AppTheme.appTextStyle(context, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
+        ));
+      }
+      final projectName = _localizedRefName(context, item['project']);
+      if (projectName.isNotEmpty) {
+        list.add(Padding(
+          padding: const EdgeInsets.only(bottom: AppTheme.spaceSm),
+          child: Text('${l10n.project}: $projectName', style: AppTheme.appTextStyle(context, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
+        ));
+      }
+      list.add(Padding(
+        padding: const EdgeInsets.only(bottom: 4),
+        child: Text(l10n.productsLabel, style: AppTheme.appTextStyle(context, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
+      ));
+      list.add(Padding(
+        padding: const EdgeInsets.only(bottom: AppTheme.spaceSm),
+        child: Text(_requestedProductsSummary(context, item), style: AppTheme.appTextStyle(context, color: AppTheme.textPrimary)),
+      ));
+      final createdStr = L10nFormatters.formatDateFromApi(context, item['createdAt']);
+      final validatedStr = L10nFormatters.formatDateFromApi(context, item['validatedAt']);
+      final distStr = L10nFormatters.formatDateFromApi(context, item['distributionDate']);
+      if (createdStr != null) {
+        list.add(Padding(
+          padding: const EdgeInsets.only(bottom: AppTheme.spaceSm),
+          child: Text('${l10n.createdDate} $createdStr', style: AppTheme.appTextStyle(context, color: AppTheme.textPrimary)),
+        ));
+      }
+      if (validatedStr != null) {
+        list.add(Padding(
+          padding: const EdgeInsets.only(bottom: AppTheme.spaceSm),
+          child: Text('${l10n.validatedDate} $validatedStr', style: AppTheme.appTextStyle(context, color: AppTheme.textPrimary)),
         ));
       }
       if (distStr != null) {
@@ -1340,8 +1427,8 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> with RouteAware
       if (widget.reportType == ReportType.stockHistory && key == 'productCreatedAt') continue;
       if (widget.reportType == ReportType.damagedProducts && (key == 'productCreatedAt' || key == 'productUpdatedAt' || key == 'createdAt' || key == 'approvedAt' || key == 'updatedAt')) continue;
       if (widget.reportType == ReportType.returns && (key == 'approvedAt' || key == 'createdAt' || key == 'updatedAt')) continue;
-      if (widget.reportType == ReportType.orders && (key == 'createdAt' || key == 'updatedAt' || key == 'approvedAt' || key == 'deliveryDate')) continue;
-      if (widget.reportType == ReportType.distributions && (key == 'validatedAt' || key == 'createdAt' || key == 'updatedAt' || key == 'bonAlimentation' || key == 'bon_alimentation' || key == 'distributionDate' || key == 'serialNumber' || key == 'serial_number')) continue;
+      if (widget.reportType == ReportType.orders && (key == 'createdAt' || key == 'updatedAt' || key == 'approvedAt' || key == 'deliveryDate' || key == 'project')) continue;
+      if (widget.reportType == ReportType.distributions && (key == 'validatedAt' || key == 'createdAt' || key == 'updatedAt' || key == 'bonAlimentation' || key == 'bon_alimentation' || key == 'distributionDate' || key == 'serialNumber' || key == 'serial_number' || key == 'project')) continue;
       if (value is Map) {
         final m = Map<String, dynamic>.from(value);
         final formattedDate = L10nFormatters.formatDateFromApi(context, m);

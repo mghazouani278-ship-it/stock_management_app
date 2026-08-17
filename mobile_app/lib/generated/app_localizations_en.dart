@@ -827,6 +827,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get orderPlacedSuccess => 'Order placed successfully';
 
   @override
+  String get orderSentToManager => 'Order sent to manager for approval';
+
+  @override
+  String get orderAwaitingManagerApproval => 'Waiting for manager approval';
+
+  @override
   String get placeOrder => 'Place Order';
 
   @override

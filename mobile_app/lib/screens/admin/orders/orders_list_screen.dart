@@ -963,6 +963,15 @@ class _AdminOrdersListScreenState extends State<AdminOrdersListScreen> {
                 label: Text(localizedOrderStatus(l10n, currentOrder.status), style: const TextStyle(fontSize: 12)),
                 backgroundColor: (currentOrder.status == 'approved' || currentOrder.status == 'completed' ? Colors.green : currentOrder.status == 'rejected' ? Colors.red : Colors.orange).withOpacity(0.2),
               ),
+              if (currentOrder.status == 'pending_manager' &&
+                  isAdmin(Provider.of<AuthProvider>(context, listen: false).user?.role))
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    l10n.orderAwaitingManagerApproval,
+                    style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.w600),
+                  ),
+                ),
               if (currentOrder.project != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(l10n.projectLabel(currentOrder.project!.displayName(context)))),
               if (currentOrder.user != null)
                 Padding(
@@ -1179,10 +1188,12 @@ class _AdminOrdersListScreenState extends State<AdminOrdersListScreen> {
         ],
       ),
       body: _buildBody(),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _loading ? null : _openNewOrder,
-        child: const Icon(Icons.add),
-      ),
+      floatingActionButton: isAdminLike(Provider.of<AuthProvider>(context).user?.role)
+          ? FloatingActionButton(
+              onPressed: _loading ? null : _openNewOrder,
+              child: const Icon(Icons.add),
+            )
+          : null,
     );
   }
 

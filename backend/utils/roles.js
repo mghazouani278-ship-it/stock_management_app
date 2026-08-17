@@ -60,7 +60,8 @@ const VALID_ROLES = [
  * Order workflow:
  * pending → (supervisor) → pending_admin | returned
  * returned → (user resubmit) → pending
- * pending_admin → (admin edits) → pending_manager
+ * pending_admin → (admin) → pending_manager
+ * admin/manager create order → pending_manager
  * pending_manager → (manager) → approved | cancelled
  * approved → (warehouse) → completed
  */

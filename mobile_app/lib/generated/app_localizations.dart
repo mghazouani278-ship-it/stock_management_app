@@ -1582,6 +1582,18 @@ abstract class AppLocalizations {
   /// **'Order placed successfully'**
   String get orderPlacedSuccess;
 
+  /// No description provided for @orderSentToManager.
+  ///
+  /// In en, this message translates to:
+  /// **'Order sent to manager for approval'**
+  String get orderSentToManager;
+
+  /// No description provided for @orderAwaitingManagerApproval.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for manager approval'**
+  String get orderAwaitingManagerApproval;
+
   /// No description provided for @placeOrder.
   ///
   /// In en, this message translates to:

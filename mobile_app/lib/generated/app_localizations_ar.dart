@@ -824,6 +824,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get orderPlacedSuccess => 'تم تقديم الطلب بنجاح';
 
   @override
+  String get orderSentToManager => 'تم إرسال الطلب إلى المدير للموافقة';
+
+  @override
+  String get orderAwaitingManagerApproval => 'في انتظار موافقة المدير';
+
+  @override
   String get placeOrder => 'تقديم الطلب';
 
   @override

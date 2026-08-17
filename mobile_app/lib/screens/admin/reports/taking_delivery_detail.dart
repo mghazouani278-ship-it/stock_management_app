@@ -111,6 +111,7 @@ Future<void> showTakingDeliveryDetails({
                         dataRowMaxHeight: 48,
                         columns: [
                           DataColumn(label: Text(dl10n.product, style: const TextStyle(fontWeight: FontWeight.w700))),
+                          DataColumn(label: Text(dl10n.requestedQuantityLabel, style: const TextStyle(fontWeight: FontWeight.w700))),
                           DataColumn(label: Text(dl10n.takingDeliveryQtyDistributed, style: const TextStyle(fontWeight: FontWeight.w700))),
                           DataColumn(label: Text(dl10n.takingDeliveryQtyRemaining, style: const TextStyle(fontWeight: FontWeight.w700))),
                         ],
@@ -118,6 +119,7 @@ Future<void> showTakingDeliveryDetails({
                           final m = Map<String, dynamic>.from(r as Map);
                           return DataRow(cells: [
                             DataCell(Text('${m['name'] ?? ''}')),
+                            DataCell(Text('${m['requested'] ?? 0}')),
                             DataCell(Text('${m['distributed'] ?? 0}')),
                             DataCell(Text('${m['remaining'] ?? 0}')),
                           ]);
@@ -291,8 +293,29 @@ Map<String, dynamic> _buildPayload(
     }
   }
 
+  final requestedById = <String, int>{};
+  final requestedNameById = <String, String>{};
+  final orderProducts = order?['products'];
+  if (orderProducts is List) {
+    for (final raw in orderProducts) {
+      if (raw is! Map) continue;
+      final prod = raw['product'];
+      final id = prod is Map
+          ? (prod['id'] ?? prod['_id'])?.toString()
+          : (prod?.toString() ?? raw['product']?.toString());
+      if (id == null || id.isEmpty) continue;
+      final name = prod is Map
+          ? (prod['name']?.toString() ?? id)
+          : (raw['name']?.toString() ?? id);
+      final qty = raw['quantity'] is num ? (raw['quantity'] as num).toInt() : int.tryParse('${raw['quantity']}') ?? 0;
+      requestedById[id] = (requestedById[id] ?? 0) + qty;
+      requestedNameById[id] = name;
+    }
+  }
+
   final productRows = <Map<String, dynamic>>[];
   final replacements = <Map<String, dynamic>>[];
+  final seenIds = <String>{};
   final distProducts = distribution['products'];
   if (distProducts is List) {
     for (final raw in distProducts) {
@@ -308,8 +331,12 @@ Map<String, dynamic> _buildPayload(
       final displayName = localizedApiProductName(context, shipName);
       final qty = p['quantity'] is num ? (p['quantity'] as num).toInt() : int.tryParse('${p['quantity']}') ?? 0;
       final boqId = (isReplaced && originalId != null && originalId.isNotEmpty) ? originalId : (shipId ?? '');
+      final requestKey = boqId.isNotEmpty ? boqId : (shipId ?? '');
+      if (requestKey.isNotEmpty) seenIds.add(requestKey);
+      if (shipId != null && shipId.isNotEmpty) seenIds.add(shipId);
       productRows.add({
         'name': displayName,
+        'requested': requestedById[requestKey] ?? requestedById[shipId ?? ''] ?? qty,
         'distributed': qty,
         'remaining': remainingByProduct[boqId] ?? remainingByProduct[shipId ?? ''] ?? 0,
       });
@@ -325,6 +352,15 @@ Map<String, dynamic> _buildPayload(
         });
       }
     }
+  }
+  for (final entry in requestedById.entries) {
+    if (seenIds.contains(entry.key)) continue;
+    productRows.add({
+      'name': localizedApiProductName(context, requestedNameById[entry.key] ?? l10n.product),
+      'requested': entry.value,
+      'distributed': 0,
+      'remaining': remainingByProduct[entry.key] ?? 0,
+    });
   }
 
   final history = (order?['history'] is List) ? List.from(order!['history'] as List) : const [];

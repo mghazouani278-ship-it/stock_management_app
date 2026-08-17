@@ -357,6 +357,8 @@
   "allProductsAdded": "تمت إضافة جميع المنتجات.",
   "addAtLeastOneProduct": "أضف منتجاً واحداً على الأقل بكمية أكبر من 0",
   "orderPlacedSuccess": "تم تقديم الطلب بنجاح",
+  "orderSentToManager": "تم إرسال الطلب إلى المدير للموافقة",
+  "orderAwaitingManagerApproval": "في انتظار موافقة المدير",
   "placeOrder": "تقديم الطلب",
   "supplementary": "إضافي",
   "notesLabel": "ملاحظات: {notes}",

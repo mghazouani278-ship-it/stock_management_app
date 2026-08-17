@@ -583,7 +583,7 @@ router.post('/', protect, async (req, res) => {
         return res.status(400).json({ success: false, message: 'You are not assigned to any project' });
       }
     } else {
-      return res.status(403).json({ success: false, message: 'Only users, supervisors or admins can create orders' });
+      return res.status(403).json({ success: false, message: 'Only users, supervisors, admins or managers can create orders' });
     }
     if (!projectId) return res.status(400).json({ success: false, message: 'Please provide a project' });
 
@@ -596,6 +596,8 @@ router.post('/', protect, async (req, res) => {
     const projectRefDb = firestore.collection('projects').doc(projectId);
     const orderRef = firestore.collection('orders').doc();
 
+    const creatorRole = req.user.role;
+    const initialStatus = isAdmin(creatorRole) || isManager(creatorRole) ? 'pending_manager' : 'pending';
     let projectNameForNotif = null;
 
     await firestore.runTransaction(async (transaction) => {
@@ -691,7 +693,7 @@ router.post('/', protect, async (req, res) => {
       transaction.set(orderRef, {
         user_id: req.user.id,
         project_id: projectId,
-        status: 'pending',
+        status: initialStatus,
         notes: notes || null,
         order_date: ordDate,
         expected_arrival_days: expectedArrivalDays,
@@ -700,7 +702,7 @@ router.post('/', protect, async (req, res) => {
         history: [{
           action: 'created',
           fromStatus: null,
-          toStatus: 'pending',
+          toStatus: initialStatus,
           actorId: req.user.id,
           actorName: req.user.name,
           actorRole: req.user.role,
@@ -715,15 +717,28 @@ router.post('/', protect, async (req, res) => {
 
     const doc = await orderRef.get();
     const data = await orderToApi(doc, firestore);
+    if (initialStatus === 'pending_manager') {
+      await createOrderNotification(firestore, {
+        type: 'order_pending_manager',
+        orderId: orderRef.id,
+        projectId,
+        userId: req.user.id,
+        userName: req.user.name,
+        targetRole: 'manager',
+        status: 'pending_manager',
+        projectName: projectNameForNotif,
+      });
+    } else {
       await createOrderNotification(firestore, {
         type: 'new_order',
         orderId: orderRef.id,
         projectId,
         userId: req.user.id,
         userName: req.user.name,
-      targetRole: 'supervisor',
+        targetRole: 'supervisor',
         projectName: projectNameForNotif,
       });
+    }
     res.status(201).json({ success: true, data });
   } catch (error) {
     if (error.code === 'NOT_FOUND') return res.status(404).json({ success: false, message: error.message });

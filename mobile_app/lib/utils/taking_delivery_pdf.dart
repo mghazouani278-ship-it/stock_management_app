@@ -91,6 +91,7 @@ class TakingDeliveryPdf {
           pw.TableHelper.fromTextArray(
             headers: [
               _forPdf(l10n.product),
+              _forPdf(l10n.requestedQuantityLabel),
               _forPdf(l10n.takingDeliveryQtyDistributed),
               _forPdf(l10n.takingDeliveryQtyRemaining),
             ],
@@ -98,6 +99,7 @@ class TakingDeliveryPdf {
               final m = Map<String, dynamic>.from(r as Map);
               return [
                 _forPdf('${m['name'] ?? ''}'),
+                _forPdf('${m['requested'] ?? 0}'),
                 _forPdf('${m['distributed'] ?? 0}'),
                 _forPdf('${m['remaining'] ?? 0}'),
               ];

@@ -6,6 +6,7 @@ import '../../../utils/order_quantity_display.dart';
 import '../../../utils/product_localized.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../services/api_service.dart';
+import '../../../utils/roles.dart';
 import '../../../widgets/connection_error_widget.dart';
 import '../../../theme/app_theme.dart';
 import '../../../widgets/app_card.dart';
@@ -309,8 +310,13 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
       }
       await _apiService.post('/orders', body);
       if (mounted) {
+        final role = authProvider.user?.role;
+        final l10n = AppLocalizations.of(context)!;
+        final message = isAdmin(role)
+            ? l10n.orderSentToManager
+            : l10n.orderPlacedSuccess;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppLocalizations.of(context)!.orderPlacedSuccess), backgroundColor: AppTheme.success),
+          SnackBar(content: Text(message), backgroundColor: AppTheme.success),
         );
         Navigator.of(context).pop(true);
       }
