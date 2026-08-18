@@ -224,13 +224,6 @@ class _WarehouseApprovedOrdersScreenState extends State<WarehouseApprovedOrdersS
     return out;
   }
 
-  Future<void> _markAsRead() async {
-    try {
-      await _apiService.put('/order-notifications/read', {});
-      if (mounted) _loadNotifications();
-    } catch (_) {}
-  }
-
   Future<void> _showDetails(Map<String, dynamic> notif) async {
     final l10n = AppLocalizations.of(context)!;
     final orderId = notif['orderId']?.toString() ?? '';
@@ -436,26 +429,17 @@ class _WarehouseApprovedOrdersScreenState extends State<WarehouseApprovedOrdersS
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (bool didPop, Object? result) async {
-        if (didPop) return;
-        await _markAsRead();
-        if (!context.mounted) return;
-        Navigator.of(context).pop(result);
-      },
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(l10n.orders),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              onPressed: _loading ? null : _loadNotifications,
-            ),
-          ],
-        ),
-        body: _buildBody(),
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(l10n.orders),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loading ? null : _loadNotifications,
+          ),
+        ],
       ),
+      body: _buildBody(),
     );
   }
 

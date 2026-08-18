@@ -26,7 +26,6 @@ class WarehouseHomeScreen extends StatefulWidget {
 
 class _WarehouseHomeScreenState extends State<WarehouseHomeScreen> with RouteAware, WidgetsBindingObserver {
   final ApiService _apiService = ApiService();
-  int _pendingOrdersCount = 0;
   int _approvedOrdersCount = 0;
   int _pendingReturnsCount = 0;
   int _pendingDistributionsCount = 0;
@@ -85,49 +84,23 @@ class _WarehouseHomeScreenState extends State<WarehouseHomeScreen> with RouteAwa
   Future<void> _loadBadgeCounts() async {
     try {
       final results = await Future.wait([
-        _apiService.get('/orders/count', queryParams: {'status': 'pending'}),
-        _apiService.get('/order-notifications'),
+        _apiService.get('/orders/count', queryParams: {'status': 'approved'}),
         _apiService.get('/returns/count', queryParams: {'status': 'pending'}),
         _apiService.get('/distributions/count', queryParams: {'status': 'pending'}),
         _apiService.get('/damaged-products', queryParams: {'status': 'pending'}),
       ]);
       if (mounted) {
-        final orderNotifs = results[1] is Map && results[1]['data'] is List
-            ? () {
-                final all = (results[1]['data'] as List).map((n) => n as Map).toList();
-                final approvedIds = <String>{};
-                for (final m in all) {
-                  if (m['type'] == 'order_approved') {
-                    final oid = m['orderId']?.toString() ?? '';
-                    if (oid.isNotEmpty) approvedIds.add(oid);
-                  }
-                }
-                return all.where((m) {
-                  if (m['type'] == 'order_approved') return true;
-                  if (m['type'] == 'new_order') {
-                    final rd = m['read'];
-                    final oid = m['orderId']?.toString() ?? '';
-                    // Don't count stale new_order once the manager already approved.
-                    if (oid.isNotEmpty && approvedIds.contains(oid)) return false;
-                    return rd != true && rd != 'true';
-                  }
-                  return false;
-                }).length;
-              }()
-            : 0;
         setState(() {
-          _pendingOrdersCount = _parseCount(results[0]);
-          _approvedOrdersCount = orderNotifs;
-          _pendingReturnsCount = _parseCount(results[2]);
-          _pendingDistributionsCount = _parseCount(results[3]);
-          _damagedProductsCount = _parseCount(results[4]);
+          _approvedOrdersCount = _parseCount(results[0]);
+          _pendingReturnsCount = _parseCount(results[1]);
+          _pendingDistributionsCount = _parseCount(results[2]);
+          _damagedProductsCount = _parseCount(results[3]);
           _stockCount = 0;
         });
       }
     } catch (_) {
       if (mounted) {
         setState(() {
-          _pendingOrdersCount = 0;
           _approvedOrdersCount = 0;
           _pendingReturnsCount = 0;
           _pendingDistributionsCount = 0;

@@ -27,11 +27,8 @@ class AdminHomeScreen extends StatefulWidget {
 class _AdminHomeScreenState extends State<AdminHomeScreen> {
   final ApiService _apiService = ApiService();
   int _pendingOrdersCount = 0;
-  int _orderNotificationsCount = 0;
   int _pendingReturnsCount = 0;
   int _pendingDistributionsCount = 0;
-  int _distributionNotificationsCount = 0;
-  int _distributionCompletedCount = 0;
   int _stockCount = 0;
 
   @override
@@ -48,22 +45,16 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           : (isAdmin(role) ? 'pending_admin' : 'pending');
       final results = await Future.wait([
         _apiService.get('/orders/count', queryParams: {'status': pendingStatus}),
-        _apiService.get('/order-notifications/count'),
         _apiService.get('/returns/count', queryParams: {'status': 'pending'}),
         _apiService.get('/distributions/count', queryParams: {'status': 'pending'}),
-        _apiService.get('/distribution-notifications/count'),
-        _apiService.get('/distribution-notifications/admin-completed/count'),
         _apiService.get('/stock/notifications-count'),
       ]);
       if (mounted) {
         setState(() {
           _pendingOrdersCount = _parseCount(results[0]);
-          _orderNotificationsCount = _parseCount(results[1]);
-          _pendingReturnsCount = _parseCount(results[2]);
-          _pendingDistributionsCount = _parseCount(results[3]);
-          _distributionNotificationsCount = _parseCount(results[4]);
-          _distributionCompletedCount = _parseCount(results[5]);
-          _stockCount = _parseCount(results[6]);
+          _pendingReturnsCount = _parseCount(results[1]);
+          _pendingDistributionsCount = _parseCount(results[2]);
+          _stockCount = _parseCount(results[3]);
         });
       }
     } catch (_) {
@@ -183,21 +174,17 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   if (!mounted) return;
                   await Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminOrdersListScreen()));
                   if (mounted) _loadBadgeCounts();
-                }, badgeCount: (_pendingOrdersCount > 0 || _orderNotificationsCount > 0) ? (_pendingOrdersCount > _orderNotificationsCount ? _pendingOrdersCount : _orderNotificationsCount) : null),
+                }, badgeCount: _pendingOrdersCount > 0 ? _pendingOrdersCount : null),
                 _buildMenuCard(context, l10n.returns, Icons.replay_rounded, const Color(0xFFF59E0B), () {
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminReturnsListScreen())).then((_) {
                     if (mounted) _loadBadgeCounts();
                   });
                 }, badgeCount: _pendingReturnsCount),
                 _buildMenuCard(context, l10n.distributions, Icons.local_shipping_rounded, const Color(0xFF6366F1), () async {
-                  try {
-                    await _apiService.put('/distribution-notifications/read', {});
-                    await _apiService.put('/distribution-notifications/admin-completed/read', {});
-                  } catch (_) {}
                   if (mounted) Navigator.push(context, MaterialPageRoute(builder: (_) => const DistributionsListScreen(showCreateFab: true))).then((_) {
                     if (mounted) _loadBadgeCounts();
                   });
-                }, badgeCount: (_pendingDistributionsCount + _distributionNotificationsCount + _distributionCompletedCount) > 0 ? _pendingDistributionsCount + _distributionNotificationsCount + _distributionCompletedCount : null),
+                }, badgeCount: _pendingDistributionsCount > 0 ? _pendingDistributionsCount : null),
                 _buildMenuCard(context, l10n.reports, Icons.analytics_rounded, const Color(0xFFEF4444), () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ReportsScreen()))),
               ]),
             ),

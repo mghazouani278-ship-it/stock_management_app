@@ -50,14 +50,17 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
         final late = (res['data'] as List)
             .whereType<Map>()
             .map((e) => Map<String, dynamic>.from(e))
-            .where((n) => n['type'] == 'order_late' && n['read'] != true)
+            .where((n) {
+              if (n['type'] != 'order_late' || n['read'] == true) return false;
+              final oid = n['orderId']?.toString() ?? '';
+              if (oid.isEmpty) return false;
+              for (final o in _orders) {
+                if (o.id == oid) return o.daysLate != null;
+              }
+              return false;
+            })
             .toList();
         if (mounted) setState(() => _lateNotifications = late);
-        if (late.isNotEmpty) {
-          try {
-            await _apiService.put('/order-notifications/read', {});
-          } catch (_) {}
-        }
       }
     } catch (_) {}
   }

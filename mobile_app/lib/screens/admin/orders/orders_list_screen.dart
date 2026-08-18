@@ -56,16 +56,19 @@ class _AdminOrdersListScreenState extends State<AdminOrdersListScreen> {
         final alerts = (res['data'] as List)
             .whereType<Map>()
             .map((e) => Map<String, dynamic>.from(e))
-            .where((n) =>
-                (n['type'] == 'order_late' || n['type'] == 'order_arrived') &&
-                n['read'] != true)
+            .where((n) {
+              if (n['read'] == true) return false;
+              if (n['type'] == 'order_arrived') return true;
+              if (n['type'] != 'order_late') return false;
+              final oid = n['orderId']?.toString() ?? '';
+              if (oid.isEmpty) return false;
+              for (final o in _orders) {
+                if (o.id == oid) return o.daysLate != null;
+              }
+              return false;
+            })
             .toList();
         if (mounted) setState(() => _lateNotifications = alerts);
-        if (alerts.isNotEmpty) {
-          try {
-            await _apiService.put('/order-notifications/read', {});
-          } catch (_) {}
-        }
       }
     } catch (_) {}
   }

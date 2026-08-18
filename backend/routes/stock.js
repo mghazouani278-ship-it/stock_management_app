@@ -54,6 +54,30 @@ async function createStockNotification(firestore, { productId, storeId, userId, 
   await firestore.collection('stock_notifications').add(doc);
 }
 
+async function markStockNotificationsReadForLine(firestore, productId, storeId, variant) {
+  if (!productId || !storeId) return;
+  const snapshot = await firestore.collection('stock_notifications')
+    .where('read', '==', false)
+    .where('product_id', '==', String(productId))
+    .limit(100)
+    .get();
+  const variantNorm = variant != null && String(variant).trim() !== ''
+    ? String(variant).trim().toLowerCase()
+    : '';
+  const batch = firestore.batch();
+  let n = 0;
+  snapshot.docs.forEach((d) => {
+    const data = d.data();
+    const sid = String(data.store_id || data.depot_id || '');
+    if (sid !== String(storeId)) return;
+    const v = String(data.variant || data.color || '').trim().toLowerCase();
+    if (variantNorm && v && v !== variantNorm) return;
+    batch.update(d.ref, { read: true });
+    n += 1;
+  });
+  if (n > 0) await batch.commit();
+}
+
 /**
  * Shape returned by GET /stock and POST/PUT responses.
  *
@@ -385,6 +409,7 @@ router.put('/:id', protect, authorizeAdminLike, async (req, res) => {
       const change = newQty - current;
       const variantLabel = variantVal ?? row.variant ?? row.color ?? variantFromId;
       await updateStock(pid, sid, change, 'manual_update', { user: req.user.id, variant: variantLabel, notes: 'Manual stock update' });
+      await markStockNotificationsReadForLine(firestore, pid, sid, variantLabel);
       const updated = await ref.get();
       const payload = await stockToApi(updated, firestore);
       return res.json({ success: true, data: payload });
@@ -409,6 +434,7 @@ router.put('/:id', protect, authorizeAdminLike, async (req, res) => {
     await ref.delete();
 
     await updateStock(pid, sid, newQty, 'manual_update', { user: req.user.id, variant: variantVal, notes: 'Stock line updated (edit)' });
+    await markStockNotificationsReadForLine(firestore, pid, sid, variantVal);
     const newDoc = await targetRef.get();
     const payload = await stockToApi(newDoc, firestore);
     return res.json({ success: true, data: payload });

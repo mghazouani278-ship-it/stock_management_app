@@ -29,7 +29,6 @@ class _WarehouseSupplementaryRequestsScreenState extends State<WarehouseSuppleme
     super.initState();
     _loadRequests();
     _loadStatusNotifications();
-    _markNotificationsRead();
   }
 
   Future<void> _loadRequests() async {
@@ -74,13 +73,6 @@ class _WarehouseSupplementaryRequestsScreenState extends State<WarehouseSuppleme
     } catch (_) {
       setState(() => _loadingNotifications = false);
     }
-  }
-
-  Future<void> _markNotificationsRead() async {
-    try {
-      await _apiService.put('/supplementary-notifications/warehouse/read', {});
-      if (mounted) _loadStatusNotifications();
-    } catch (_) {}
   }
 
   void _showDetails(SupplementaryRequest req) {

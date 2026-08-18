@@ -52,7 +52,8 @@ async function checkAndNotifyLateOrders(firestore, createOrderNotification) {
   for (const doc of snapshot.docs) {
     const data = doc.data();
     const status = migrateOrderStatus(data.status || '');
-    if (status === 'completed' || status === 'cancelled' || status === 'rejected') continue;
+    if (status !== 'approved') continue;
+    if (toYmd(data.distribution_date) || toYmd(data.delivery_date)) continue;
 
     const days = normalizeExpectedArrivalDays(data.expected_arrival_days);
     if (!days) continue;
@@ -100,6 +101,19 @@ async function checkAndNotifyLateOrders(firestore, createOrderNotification) {
   return { checked: snapshot.size, notified };
 }
 
+async function clearLateNotificationsForOrder(firestore, orderId) {
+  if (!orderId) return;
+  const snapshot = await firestore.collection('order_notifications')
+    .where('order_id', '==', String(orderId))
+    .where('type', '==', 'order_late')
+    .limit(50)
+    .get();
+  if (snapshot.empty) return;
+  const batch = firestore.batch();
+  snapshot.docs.forEach((d) => batch.update(d.ref, { read: true }));
+  await batch.commit();
+}
+
 module.exports = {
   toYmd,
   addDaysYmd,
@@ -107,4 +121,5 @@ module.exports = {
   normalizeExpectedArrivalDays,
   computeExpectedArrivalDate,
   checkAndNotifyLateOrders,
+  clearLateNotificationsForOrder,
 };

@@ -33,7 +33,7 @@ class _UserHomeScreenState extends State<UserHomeScreen> with RouteAware, Widget
 
   Future<void> _loadBadgeCounts() async {
     try {
-      final res = await _apiService.get('/order-notifications/count');
+      final res = await _apiService.get('/orders/count', queryParams: {'status': 'returned'});
       if (!mounted) return;
       if (res['success'] == true) {
         setState(() => _orderNotificationsCount = (res['count'] as num?)?.toInt() ?? 0);

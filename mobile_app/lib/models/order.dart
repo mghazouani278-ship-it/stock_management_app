@@ -77,10 +77,13 @@ class Order {
     }
   }
 
-  /// Calendar days past [expectedArrivalDate]; null if on time or already arrived/cancelled.
+  /// Days past the expected date while warehouse has not distributed yet.
+  /// Hidden after distribution is applied, and not shown before manager approval.
   int? get daysLate {
     final closed = status == 'completed' || status == 'cancelled' || status == 'rejected';
     if (closed) return null;
+    if (status != 'approved') return null;
+    if (_ymd(distributionDate) != null) return null;
     final expected = expectedArrivalDate ?? _computeExpectedFromOrderDate();
     if (expected == null || expected.isEmpty) return null;
     final today = DateTime.now().toUtc();

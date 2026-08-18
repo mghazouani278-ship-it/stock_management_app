@@ -25,7 +25,6 @@ class SupervisorHomeScreen extends StatefulWidget {
 class _SupervisorHomeScreenState extends State<SupervisorHomeScreen> with WidgetsBindingObserver {
   final ApiService _apiService = ApiService();
   int _pendingOrdersCount = 0;
-  int _orderNotificationsCount = 0;
 
   @override
   void initState() {
@@ -64,27 +63,21 @@ class _SupervisorHomeScreenState extends State<SupervisorHomeScreen> with Widget
     try {
       final results = await Future.wait([
         _apiService.get('/orders/count', queryParams: {'status': 'pending'}),
-        _apiService.get('/order-notifications/count'),
       ]);
       if (!mounted) return;
       setState(() {
         _pendingOrdersCount = _parseCount(results[0]);
-        _orderNotificationsCount = _parseCount(results[1]);
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _pendingOrdersCount = 0;
-        _orderNotificationsCount = 0;
       });
     }
   }
 
   int? get _ordersBadge {
-    final n = _pendingOrdersCount > _orderNotificationsCount
-        ? _pendingOrdersCount
-        : _orderNotificationsCount;
-    return n > 0 ? n : null;
+    return _pendingOrdersCount > 0 ? _pendingOrdersCount : null;
   }
 
   Future<void> _openOrders() async {

@@ -92,12 +92,6 @@ class _StockListScreenState extends State<StockListScreen> {
     return null;
   }
 
-  Future<void> _markStockNotificationsRead() async {
-    try {
-      await _apiService.put('/stock/notifications-read', {});
-    } catch (_) {}
-  }
-
   @override
   void initState() {
     super.initState();
@@ -931,17 +925,7 @@ class _StockListScreenState extends State<StockListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (bool didPop, Object? result) async {
-        if (didPop) return;
-        await _markStockNotificationsRead();
-        if (!context.mounted) return;
-        setState(() => _warehouseAddedByProductStore = {});
-        if (!context.mounted) return;
-        Navigator.of(context).pop(result);
-      },
-      child: Scaffold(
+    return Scaffold(
       appBar: AppBar(
         title: AppSearchBar(
           title: AppLocalizations.of(context)!.stockManagement,
@@ -969,7 +953,6 @@ class _StockListScreenState extends State<StockListScreen> {
               onPressed: _showAddStock,
               child: const Icon(Icons.add),
             ),
-    ),
     );
   }
 

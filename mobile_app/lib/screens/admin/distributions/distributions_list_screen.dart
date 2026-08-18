@@ -61,7 +61,6 @@ class _DistributionsListScreenState extends State<DistributionsListScreen> {
     _loadDistributions();
     if (widget.hideValidate) {
       _loadStatusNotifications();
-      _markNotificationsRead();
     }
     _searchController.addListener(() => setState(() {}));
   }
@@ -134,14 +133,6 @@ class _DistributionsListScreenState extends State<DistributionsListScreen> {
       if (!mounted) return;
       setState(() => _loadingNotifications = false);
     }
-  }
-
-  Future<void> _markNotificationsRead() async {
-    if (!widget.hideValidate) return;
-    try {
-      await _apiService.put('/distribution-notifications/warehouse/read', {});
-      if (mounted) _loadStatusNotifications();
-    } catch (_) {}
   }
 
   Future<void> _deleteDistribution(Distribution dist) async {

@@ -9,6 +9,26 @@ const { projectRef, storeRef, userRef } = require('../utils/embedRefs');
 const { variantSegmentForStockDocId } = require('../utils/stockColors');
 const { buildStoreByProductKey, makeProductKey } = require('../utils/resolveProductStockStore');
 const { isAdminLike, isWarehouseLike, isSupervisor, userHasProjectAccess } = require('../utils/roles');
+const { toYmd, clearLateNotificationsForOrder } = require('../utils/lateOrders');
+
+async function applyOrderDistributed(firestore, orderId, distributionDate) {
+  if (!orderId || !String(orderId).trim()) return;
+  const orderRef = firestore.collection('orders').doc(String(orderId).trim());
+  const orderDoc = await orderRef.get();
+  if (!orderDoc.exists) return;
+  const st = orderDoc.data().status;
+  if (st !== 'approved' && st !== 'completed') return;
+  let distYmd = toYmd(distributionDate);
+  if (!distYmd) distYmd = new Date().toISOString().split('T')[0];
+  await orderRef.update({
+    status: 'completed',
+    distribution_date: distYmd,
+    arrival_date: distYmd,
+    delivery_date: admin.firestore.FieldValue.serverTimestamp(),
+    updated_at: admin.firestore.FieldValue.serverTimestamp(),
+  });
+  await clearLateNotificationsForOrder(firestore, orderRef.id);
+}
 
 function getStockId(productId, storeId, variantLabel) {
   const c = variantLabel && String(variantLabel).trim().toLowerCase();
@@ -672,33 +692,7 @@ router.post('/', protect, authorizeAdminOrWarehouse, async (req, res) => {
       updated_at: admin.firestore.FieldValue.serverTimestamp(),
     });
     if (orderId && String(orderId).trim()) {
-      const orderRef = firestore.collection('orders').doc(String(orderId).trim());
-      const orderDoc = await orderRef.get();
-      if (orderDoc.exists) {
-        const st = orderDoc.data().status;
-        if (st === 'approved' || st === 'completed') {
-          // Distribution day + arrival day (same calendar day when delivered with the distribution).
-          // UI "Arrive in" = inclusive days between those two dates (min 1).
-          let distYmd = null;
-          if (distributionDate) {
-            distYmd = String(distributionDate).slice(0, 10);
-          } else if (distDate && typeof distDate.toDate === 'function') {
-            distYmd = distDate.toDate().toISOString().split('T')[0];
-          } else if (distDate instanceof Date && !Number.isNaN(distDate.getTime())) {
-            distYmd = distDate.toISOString().split('T')[0];
-          }
-          if (!distYmd || !/^\d{4}-\d{2}-\d{2}/.test(distYmd)) {
-            distYmd = new Date().toISOString().split('T')[0];
-          }
-          await orderRef.update({
-            status: 'completed',
-            distribution_date: distYmd,
-            arrival_date: distYmd,
-            delivery_date: admin.firestore.FieldValue.serverTimestamp(),
-            updated_at: admin.firestore.FieldValue.serverTimestamp(),
-          });
-        }
-      }
+      await applyOrderDistributed(firestore, orderId, distributionDate || distDate);
     }
     const doc = await ref.get();
     const data = await distributionToApi(doc, firestore);
@@ -744,6 +738,9 @@ router.put('/:id/validate', protect, authorizeAdminOrWarehouse, async (req, res)
     const updated = await ref.get();
     const out = await distributionToApi(updated, firestore);
     await sendValidatedDistributionNotifications(firestore, ref, data, req, projectId, sid);
+    if (data.order_id) {
+      await applyOrderDistributed(firestore, data.order_id, data.distribution_date);
+    }
     res.json({ success: true, data: out });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
